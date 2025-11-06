@@ -1,0 +1,6 @@
+{
+    "enabledMcpjsonServers": [
+      "mcp-applink"
+    ],
+    "enableAllProjectMcpServers": true
+}
