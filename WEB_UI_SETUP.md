@@ -28,7 +28,7 @@ A beautiful, real-time Web UI for managing semiconductor manufacturing inventory
 
 ## Access the Web UI
 
-**URL:** https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/inventory.html
+**URL:** https://slack-heroku-demo-ars.herokuapp.com/inventory.html
 
 ## Features
 
@@ -81,8 +81,8 @@ Agentforce sees new inventory
 The app needs Slack credentials to start:
 
 ```bash
-heroku config:set SLACK_BOT_TOKEN=xoxb-your-token -a sorbet-vibes-b1eea
-heroku config:set SLACK_SIGNING_SECRET=your-secret -a sorbet-vibes-b1eea
+heroku config:set SLACK_BOT_TOKEN=xoxb-your-token -a slack-heroku-demo-ars
+heroku config:set SLACK_SIGNING_SECRET=your-secret -a slack-heroku-demo-ars
 ```
 
 ### 2. Initialize Database
@@ -90,7 +90,7 @@ heroku config:set SLACK_SIGNING_SECRET=your-secret -a sorbet-vibes-b1eea
 Load the GPU chip inventory data:
 
 ```bash
-heroku pg:psql -a sorbet-vibes-b1eea < db/init.sql
+heroku pg:psql -a slack-heroku-demo-ars < db/init.sql
 ```
 
 This creates:
@@ -104,7 +104,7 @@ This creates:
 To receive inventory update notifications in Slack:
 
 ```bash
-heroku config:set SLACK_NOTIFICATION_CHANNEL=#inventory-alerts -a sorbet-vibes-b1eea
+heroku config:set SLACK_NOTIFICATION_CHANNEL=#inventory-alerts -a slack-heroku-demo-ars
 ```
 
 Create the channel first, then invite your bot to it.
@@ -115,13 +115,13 @@ Add these slash commands to your Slack app:
 - `/stock <SKU>` → Check inventory for any product
 - `/low-stock` → View products needing reorder
 
-Point both to: `https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/slack/events`
+Point both to: `https://slack-heroku-demo-ars.herokuapp.com/slack/events`
 
 ## Using the Web UI
 
 ### Basic Workflow
 
-1. **Open UI:** https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/inventory.html
+1. **Open UI:** https://slack-heroku-demo-ars.herokuapp.com/inventory.html
 
 2. **Browse Products:** Scroll through GPU chips and components
 
@@ -213,13 +213,13 @@ Returns list of products at or below reorder level with warehouse locations.
 ### Get All Inventory
 
 ```bash
-curl https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/api/inventory/list
+curl https://slack-heroku-demo-ars.herokuapp.com/api/inventory/list
 ```
 
 ### Update Inventory
 
 ```bash
-curl -X POST https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/api/inventory/update \
+curl -X POST https://slack-heroku-demo-ars.herokuapp.com/api/inventory/update \
   -H "Content-Type: application/json" \
   -d '{
     "sku": "GPU-H100-80GB",
@@ -232,16 +232,16 @@ curl -X POST https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/api/inventory
 
 **App not starting:**
 - Ensure SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET are set
-- Check: `heroku config -a sorbet-vibes-b1eea`
+- Check: `heroku config -a slack-heroku-demo-ars`
 
 **UI shows empty:**
 - Database needs initialization
-- Run: `heroku pg:psql -a sorbet-vibes-b1eea < db/init.sql`
+- Run: `heroku pg:psql -a slack-heroku-demo-ars < db/init.sql`
 
 **No Slack notifications:**
 - Set SLACK_NOTIFICATION_CHANNEL environment variable
 - Ensure bot is invited to the channel
-- Check logs: `heroku logs --tail -a sorbet-vibes-b1eea`
+- Check logs: `heroku logs --tail -a slack-heroku-demo-ars`
 
 **Update button doesn't work:**
 - Check browser console for errors

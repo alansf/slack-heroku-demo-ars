@@ -4,8 +4,8 @@
 
 Your Slack Bolt app with AppLink User Plus Mode has been deployed to Heroku!
 
-**App Name**: sorbet-vibes-b1eea
-**App URL**: https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/
+**App Name**: slack-heroku-demo-ars
+**App URL**: https://slack-heroku-demo-ars.herokuapp.com/
 **App UUID**: 826a7faf-002a-48e4-ba29-3d20253c70fd
 
 ## What's Been Completed
@@ -35,11 +35,11 @@ Your Slack Bolt app with AppLink User Plus Mode has been deployed to Heroku!
 
 **Configure Slash Commands:**
 Create these two commands pointing to your app URL:
-- `/customer-lookup` → https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/slack/events
-- `/database-stats` → https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/slack/events
+- `/customer-lookup` → https://slack-heroku-demo-ars.herokuapp.com/slack/events
+- `/database-stats` → https://slack-heroku-demo-ars.herokuapp.com/slack/events
 
 **Enable Event Subscriptions:**
-- Request URL: https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/slack/events
+- Request URL: https://slack-heroku-demo-ars.herokuapp.com/slack/events
 - Subscribe to bot events: `app_mention`
 
 **Install App to Workspace** and copy your:
@@ -51,8 +51,8 @@ Create these two commands pointing to your app URL:
 Run these commands with your actual Slack credentials:
 
 ```bash
-heroku config:set SLACK_BOT_TOKEN=xoxb-your-actual-token -a sorbet-vibes-b1eea
-heroku config:set SLACK_SIGNING_SECRET=your-actual-signing-secret -a sorbet-vibes-b1eea
+heroku config:set SLACK_BOT_TOKEN=xoxb-your-actual-token -a slack-heroku-demo-ars
+heroku config:set SLACK_SIGNING_SECRET=your-actual-signing-secret -a slack-heroku-demo-ars
 ```
 
 This will automatically restart your app.
@@ -62,7 +62,7 @@ This will automatically restart your app.
 Once the database is fully provisioned (it may still be provisioning), run:
 
 ```bash
-heroku pg:psql -a sorbet-vibes-b1eea < db/init.sql
+heroku pg:psql -a slack-heroku-demo-ars < db/init.sql
 ```
 
 This creates the `customers` and `orders` tables with sample data.
@@ -75,26 +75,26 @@ Once enabled, run:
 
 ```bash
 # Attach AppLink addon
-heroku addons:create heroku-applink:free -a sorbet-vibes-b1eea
+heroku addons:create heroku-applink:free -a slack-heroku-demo-ars
 
 # Set to User Plus Mode
-heroku applink:auth:mode userplus -a sorbet-vibes-b1eea
+heroku applink:auth:mode userplus -a slack-heroku-demo-ars
 
 # View and sync actions to Salesforce
-heroku applink:actions -a sorbet-vibes-b1eea
-heroku applink:actions:sync -a sorbet-vibes-b1eea
+heroku applink:actions -a slack-heroku-demo-ars
+heroku applink:actions:sync -a slack-heroku-demo-ars
 ```
 
 ### 5. Verify Everything Works
 
 **Test Health Endpoint:**
 ```bash
-curl https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/
+curl https://slack-heroku-demo-ars.herokuapp.com/
 ```
 
 **Check App Logs:**
 ```bash
-heroku logs --tail -a sorbet-vibes-b1eea
+heroku logs --tail -a slack-heroku-demo-ars
 ```
 
 **Test in Slack:**
@@ -151,13 +151,13 @@ All API endpoints are protected with User Plus Mode validation:
 
 - Check the main README.md for detailed documentation
 - See config/applink-setup.md for AppLink configuration details
-- View logs: `heroku logs --tail -a sorbet-vibes-b1eea`
+- View logs: `heroku logs --tail -a slack-heroku-demo-ars`
 
 ## Common Issues
 
 **App crashed on startup:**
 - Ensure SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET are set
-- Check: `heroku config -a sorbet-vibes-b1eea`
+- Check: `heroku config -a slack-heroku-demo-ars`
 
 **Database connection errors:**
 - Wait for Postgres to finish provisioning

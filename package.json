@@ -1,5 +1,5 @@
 {
-  "name": "slack-applink-bot",
+  "name": "slack-heroku-demo-ars",
   "version": "1.0.0",
   "description": "Slack Bolt app with Heroku AppLink User Plus Mode for Agentforce Actions",
   "main": "src/app.js",

@@ -143,7 +143,7 @@ Natural language queries:
 ### Via API (with User Plus Mode headers):
 
 ```bash
-curl -X POST https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/api/inventory/check-stock \
+curl -X POST https://slack-heroku-demo-ars.herokuapp.com/api/inventory/check-stock \
   -H "Content-Type: application/json" \
   -H "x-salesforce-user-id: 005xx000001X8Uz" \
   -H "x-salesforce-org-id: 00Dxx0000001gEK" \
@@ -172,7 +172,7 @@ Salesforce (CRM) ←→ AppLink (Auth) ←→ Heroku Gateway (this app) ←→ I
 To populate the database with sample data:
 
 ```bash
-heroku pg:psql -a sorbet-vibes-b1eea < db/init.sql
+heroku pg:psql -a slack-heroku-demo-ars < db/init.sql
 ```
 
 This creates all tables, indexes, views, and loads sample data.
@@ -189,25 +189,26 @@ This creates all tables, indexes, views, and loads sample data.
 
 1. **Set Slack Credentials** (required for app to start):
    ```bash
-   heroku config:set SLACK_BOT_TOKEN=xoxb-your-token -a sorbet-vibes-b1eea
-   heroku config:set SLACK_SIGNING_SECRET=your-secret -a sorbet-vibes-b1eea
+   heroku config:set SLACK_BOT_TOKEN=xoxb-your-token -a slack-heroku-demo-ars
+   heroku config:set SLACK_SIGNING_SECRET=your-secret -a slack-heroku-demo-ars
    ```
 
 2. **Initialize Database**:
    ```bash
-   heroku pg:psql -a sorbet-vibes-b1eea < db/init.sql
+   heroku pg:psql -a slack-heroku-demo-ars < db/init.sql
    ```
 
 3. **Enable AppLink** (when team admin allows):
    ```bash
-   heroku addons:create heroku-applink:free -a sorbet-vibes-b1eea
-   heroku applink:auth:mode userplus -a sorbet-vibes-b1eea
-   heroku applink:actions:sync -a sorbet-vibes-b1eea
+   heroku addons:create heroku-applink:free -a slack-heroku-demo-ars
+   heroku applink:auth:mode userplus -a slack-heroku-demo-ars
+   heroku applink:actions:sync -a slack-heroku-demo-ars
    ```
 
 4. **Configure Slack App**:
    - Add slash commands: `/stock`, `/low-stock`
    - Point to: https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/slack/events
+   - Point to: https://slack-heroku-demo-ars.herokuapp.com/slack/events
 
 5. **Test in Slack**:
    - Try `/stock LAPTOP-PRO-15`

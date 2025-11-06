@@ -14,14 +14,14 @@ This provides the strongest security model, ensuring that only authenticated Sal
 ### 1. Attach AppLink Addon
 
 ```bash
-heroku addons:create heroku-applink:free -a sorbet-vibes-b1eea
+heroku addons:create heroku-applink:free -a slack-heroku-demo-ars
 ```
 
 ### 2. Configure User Plus Mode
 
 ```bash
 # Set authentication mode to User Plus
-heroku applink:auth:mode userplus -a sorbet-vibes-b1eea
+heroku applink:auth:mode userplus -a slack-heroku-demo-ars
 
 # This enables both user and app credential validation
 ```
@@ -36,10 +36,10 @@ AppLink will automatically discover your API endpoints and generate:
 
 ```bash
 # View available actions
-heroku applink:actions -a sorbet-vibes-b1eea
+heroku applink:actions -a slack-heroku-demo-ars
 
 # Sync actions to Salesforce
-heroku applink:actions:sync -a sorbet-vibes-b1eea
+heroku applink:actions:sync -a slack-heroku-demo-ars
 ```
 
 ### 4. Configure Slack Credentials
@@ -47,8 +47,8 @@ heroku applink:actions:sync -a sorbet-vibes-b1eea
 The app requires Slack credentials to be set as environment variables:
 
 ```bash
-heroku config:set SLACK_BOT_TOKEN=xoxb-your-token -a sorbet-vibes-b1eea
-heroku config:set SLACK_SIGNING_SECRET=your-signing-secret -a sorbet-vibes-b1eea
+heroku config:set SLACK_BOT_TOKEN=xoxb-your-token -a slack-heroku-demo-ars
+heroku config:set SLACK_SIGNING_SECRET=your-signing-secret -a slack-heroku-demo-ars
 ```
 
 ## Available Agentforce Actions
@@ -95,13 +95,13 @@ You can test the endpoints directly:
 
 ```bash
 # Get app URL
-heroku info -a sorbet-vibes-b1eea
+heroku info -a slack-heroku-demo-ars
 
 # Test health check
-curl https://your-app.herokuapp.com/
+curl https://slack-heroku-demo-ars.herokuapp.com/
 
 # Test with User Plus Mode headers (simulated)
-curl -X POST https://your-app.herokuapp.com/api/customers/search \
+curl -X POST https://slack-heroku-demo-ars.herokuapp.com/api/customers/search \
   -H "Content-Type: application/json" \
   -H "x-salesforce-user-id: test-user-id" \
   -H "x-salesforce-org-id: test-org-id" \

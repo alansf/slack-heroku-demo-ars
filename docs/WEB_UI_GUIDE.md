@@ -10,9 +10,9 @@ Web UI → Database Update → Slack Notification → Agentforce Sync
 
 ## Accessing the UI
 
-Navigate to: `https://your-app.herokuapp.com/inventory.html`
+Navigate to: `https://slack-heroku-demo-ars.herokuapp.com/inventory.html`
 
-For this app: https://sorbet-vibes-b1eea-a81ac22c5102.herokuapp.com/inventory.html
+For this app: https://slack-heroku-demo-ars.herokuapp.com/inventory.html
 
 ## Features
 
@@ -146,7 +146,7 @@ When inventory is updated via the UI, a rich notification is sent to Slack:
 
 **Configure notifications:**
 ```bash
-heroku config:set SLACK_NOTIFICATION_CHANNEL=#inventory-alerts -a sorbet-vibes-b1eea
+heroku config:set SLACK_NOTIFICATION_CHANNEL=#inventory-alerts -a slack-heroku-demo-ars
 ```
 
 ## Integration Flow
@@ -179,7 +179,7 @@ After updating via UI, Agentforce can query the new inventory:
 
 **Via API:**
 ```bash
-curl -X POST https://your-app.herokuapp.com/api/inventory/check-stock \
+curl -X POST https://slack-heroku-demo-ars.herokuapp.com/api/inventory/check-stock \
   -H "Content-Type: application/json" \
   -H "x-salesforce-user-id: user-id" \
   -H "x-salesforce-org-id: org-id" \

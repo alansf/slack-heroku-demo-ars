@@ -246,39 +246,39 @@ Shows products needing reorder with warehouse locations and quantities.
 
 ```bash
 # Clone or navigate to project
-cd slack-applink-bot
+cd slack-heroku-demo-ars
 
-# Create Heroku app (already created as sorbet-vibes-b1eea)
-# heroku create sorbet-vibes-b1eea
+# Create Heroku app (already created as slack-heroku-demo-ars)
+# heroku create slack-heroku-demo-ars
 
 # Add Postgres
-heroku addons:create heroku-postgresql:essential-0 -a sorbet-vibes-b1eea
+heroku addons:create heroku-postgresql:essential-0 -a slack-heroku-demo-ars
 
 # Set Slack credentials
-heroku config:set SLACK_BOT_TOKEN=xoxb-your-token -a sorbet-vibes-b1eea
-heroku config:set SLACK_SIGNING_SECRET=your-secret -a sorbet-vibes-b1eea
+heroku config:set SLACK_BOT_TOKEN=xoxb-your-token -a slack-heroku-demo-ars
+heroku config:set SLACK_SIGNING_SECRET=your-secret -a slack-heroku-demo-ars
 
 # Deploy
 git push heroku main
 
 # Initialize database
-heroku pg:psql -a sorbet-vibes-b1eea < db/init.sql
+heroku pg:psql -a slack-heroku-demo-ars < db/init.sql
 ```
 
 ### 3. Configure AppLink User Plus Mode
 
 ```bash
 # Attach AppLink addon
-heroku addons:create heroku-applink:free -a sorbet-vibes-b1eea
+heroku addons:create heroku-applink:free -a slack-heroku-demo-ars
 
 # Set to User Plus Mode
-heroku applink:auth:mode userplus -a sorbet-vibes-b1eea
+heroku applink:auth:mode userplus -a slack-heroku-demo-ars
 
 # View available actions
-heroku applink:actions -a sorbet-vibes-b1eea
+heroku applink:actions -a slack-heroku-demo-ars
 
 # Sync actions to Salesforce
-heroku applink:actions:sync -a sorbet-vibes-b1eea
+heroku applink:actions:sync -a slack-heroku-demo-ars
 ```
 
 ### 4. Configure in Salesforce
@@ -293,12 +293,12 @@ heroku applink:actions:sync -a sorbet-vibes-b1eea
 Get your Heroku app URL and update Slack:
 
 ```bash
-heroku info -a sorbet-vibes-b1eea | grep "Web URL"
+heroku info -a slack-heroku-demo-ars | grep "Web URL"
 ```
 
 In Slack App settings:
-- **Request URL**: `https://your-app.herokuapp.com/slack/events`
-- **Slash Command URLs**: `https://your-app.herokuapp.com/slack/events`
+- **Request URL**: `https://slack-heroku-demo-ars.herokuapp.com/slack/events`
+- **Slash Command URLs**: `https://slack-heroku-demo-ars.herokuapp.com/slack/events`
 
 ## Using with Agentforce
 
@@ -350,26 +350,26 @@ npm start
 
 ```bash
 # View logs
-heroku logs --tail -a sorbet-vibes-b1eea
+heroku logs --tail -a slack-heroku-demo-ars
 
 # Check app status
-heroku ps -a sorbet-vibes-b1eea
+heroku ps -a slack-heroku-demo-ars
 
 # View AppLink status
-heroku applink:info -a sorbet-vibes-b1eea
+heroku applink:info -a slack-heroku-demo-ars
 ```
 
 ## Troubleshooting
 
 ### Actions not appearing in Salesforce
 ```bash
-heroku applink:actions:sync -a sorbet-vibes-b1eea
+heroku applink:actions:sync -a slack-heroku-demo-ars
 ```
 
 ### Database connection issues
 ```bash
-heroku pg:info -a sorbet-vibes-b1eea
-heroku config:get DATABASE_URL -a sorbet-vibes-b1eea
+heroku pg:info -a slack-heroku-demo-ars
+heroku config:get DATABASE_URL -a slack-heroku-demo-ars
 ```
 
 ### Slack commands not working
@@ -386,4 +386,4 @@ heroku config:get DATABASE_URL -a sorbet-vibes-b1eea
 ## License
 
 MIT
-# sorbet-vibes-b1eea
+# slack-heroku-demo-ars
