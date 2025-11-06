@@ -1,17 +1,24 @@
-# Slack AppLink Bot with User Plus Mode
+# Slack AppLink Bot with User Plus Mode + ERP Gateway
 
-A Slack Bolt application integrated with Heroku AppLink in User Plus Mode, enabling secure Salesforce Agentforce Actions to query both CRM and external Postgres data.
+A Slack Bolt application integrated with Heroku AppLink in User Plus Mode, enabling secure Salesforce Agentforce Actions to query both CRM and external ERP data. This app demonstrates the **secure gateway pattern** for connecting Salesforce to internal enterprise systems.
 
 ## Overview
 
 This application demonstrates the power of Heroku AppLink's **User Plus Mode** - a unique security model that validates both Salesforce user credentials AND application credentials for each request. This ensures that Agentforce Actions maintain Salesforce user permissions while accessing external data sources.
 
+The app includes two complete use cases:
+1. **Customer & Order Management**: Query external customer database
+2. **ERP Inventory Gateway**: Check stock levels across warehouses
+
 ### Key Features
 
 - **User Plus Mode Security**: Strongest AppLink authentication combining user and app validation
 - **Agentforce Integration**: Exposes APIs as Agentforce Actions for natural language queries
+- **ERP Gateway Pattern**: Secure microservice for internal system access
 - **Cross-Database Queries**: Query both Salesforce CRM and external Postgres data
 - **Slack Commands**: Interactive Slack bot with slash commands
+- **Inventory Management**: Real-time stock checks across multiple warehouses
+- **Audit Trail**: Complete logging of all access with user context
 - **Automatic Action Generation**: AppLink auto-generates Apex, Flow, and Agentforce actions
 
 ## Architecture
@@ -24,11 +31,18 @@ Salesforce Agentforce
    AppLink Layer
        |
        v
-  Slack Bolt App (this app)
+  Heroku Microservice Gateway (this app)
        |
        +---> Postgres DB (external customer data)
+       +---> Postgres DB (ERP inventory system)
        +---> Slack API (bot interactions)
 ```
+
+This app acts as a **secure gateway** between Salesforce and internal systems, providing:
+- Authentication & authorization via User Plus Mode
+- Data transformation between systems
+- Audit logging of all access
+- Rate limiting and caching capabilities
 
 ## What is User Plus Mode?
 
@@ -124,15 +138,90 @@ Get comprehensive analytics about a customer across CRM and external data.
 }
 ```
 
+### 4. Check Stock Levels (ERP Gateway)
+**POST** `/api/inventory/check-stock`
+
+Query inventory levels for a product across warehouses.
+
+**Request Body**:
+```json
+{
+  "sku": "LAPTOP-PRO-15",
+  "warehouse_code": "WH-SF-001"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "product": {
+    "sku": "LAPTOP-PRO-15",
+    "name": "Professional Laptop 15\"",
+    "unitPrice": 1299.99
+  },
+  "inventory": {
+    "totalAvailable": 102,
+    "warehouses": [...]
+  }
+}
+```
+
+### 5. Get Low Stock Alerts (ERP Gateway)
+**POST** `/api/inventory/low-stock-alerts`
+
+Retrieve products at or below reorder levels.
+
+**Request Body**:
+```json
+{
+  "category": "Electronics",
+  "limit": 20
+}
+```
+
+### 6. Get Inventory Transaction History (ERP Gateway)
+**POST** `/api/inventory/transaction-history`
+
+View audit trail of inventory movements.
+
+**Request Body**:
+```json
+{
+  "sku": "LAPTOP-PRO-15",
+  "days": 30
+}
+```
+
 ## Slack Commands
 
-### `/customer-lookup <name or email>`
+### Customer Management
+
+#### `/customer-lookup <name or email>`
 Search for customers directly from Slack.
 
 Example: `/customer-lookup alice`
 
-### `/database-stats`
+#### `/database-stats`
 View database statistics including total customers, orders, and revenue.
+
+### ERP Inventory Management
+
+#### `/stock <SKU>`
+Check inventory levels for a product across all warehouses.
+
+Example: `/stock LAPTOP-PRO-15`
+
+Shows:
+- Product details (name, category, price)
+- Total available quantities
+- Breakdown by warehouse with status indicators
+- Low stock warnings
+
+#### `/low-stock`
+View all products at or below reorder levels.
+
+Shows products needing reorder with warehouse locations and quantities.
 
 ## Setup Instructions
 

@@ -174,6 +174,245 @@ app.post('/api/analytics/customer-insights', validateUserPlusMode, async (req, r
   }
 });
 
+// ===== ERP INVENTORY GATEWAY ENDPOINTS =====
+
+// Action 4: Check Stock Levels by SKU
+app.post('/api/inventory/check-stock', validateUserPlusMode, async (req, res) => {
+  try {
+    const { sku, warehouse_code } = req.body;
+    const sfContext = req.salesforceContext;
+
+    console.log('[User Plus Mode] User ' + sfContext.userName + ' checking stock for SKU: ' + sku);
+
+    let query, params;
+
+    if (warehouse_code) {
+      // Check stock at specific warehouse
+      query = `
+        SELECT
+          p.sku,
+          p.name,
+          p.description,
+          p.category,
+          p.unit_price,
+          w.name as warehouse_name,
+          w.location as warehouse_location,
+          w.code as warehouse_code,
+          i.quantity_on_hand,
+          i.quantity_reserved,
+          i.quantity_available,
+          p.reorder_level,
+          CASE
+            WHEN i.quantity_available <= p.reorder_level THEN 'LOW_STOCK'
+            WHEN i.quantity_available = 0 THEN 'OUT_OF_STOCK'
+            ELSE 'IN_STOCK'
+          END as stock_status
+        FROM products p
+        JOIN inventory i ON p.id = i.product_id
+        JOIN warehouses w ON i.warehouse_id = w.id
+        WHERE p.sku = $1 AND w.code = $2
+      `;
+      params = [sku, warehouse_code];
+    } else {
+      // Check stock across all warehouses
+      query = `
+        SELECT
+          p.sku,
+          p.name,
+          p.description,
+          p.category,
+          p.unit_price,
+          w.name as warehouse_name,
+          w.location as warehouse_location,
+          w.code as warehouse_code,
+          i.quantity_on_hand,
+          i.quantity_reserved,
+          i.quantity_available,
+          p.reorder_level,
+          CASE
+            WHEN i.quantity_available <= p.reorder_level THEN 'LOW_STOCK'
+            WHEN i.quantity_available = 0 THEN 'OUT_OF_STOCK'
+            ELSE 'IN_STOCK'
+          END as stock_status
+        FROM products p
+        JOIN inventory i ON p.id = i.product_id
+        JOIN warehouses w ON i.warehouse_id = w.id
+        WHERE p.sku = $1
+        ORDER BY i.quantity_available DESC
+      `;
+      params = [sku];
+    }
+
+    const result = await pool.query(query, params);
+
+    if (result.rows.length === 0) {
+      return res.json({
+        success: true,
+        found: false,
+        message: 'Product not found or no inventory data available',
+        sku: sku,
+        requestedBy: sfContext.userName
+      });
+    }
+
+    // Calculate total available across all warehouses
+    const totalAvailable = result.rows.reduce((sum, row) => sum + parseInt(row.quantity_available || 0), 0);
+    const totalOnHand = result.rows.reduce((sum, row) => sum + parseInt(row.quantity_on_hand || 0), 0);
+    const totalReserved = result.rows.reduce((sum, row) => sum + parseInt(row.quantity_reserved || 0), 0);
+
+    res.json({
+      success: true,
+      found: true,
+      product: {
+        sku: result.rows[0].sku,
+        name: result.rows[0].name,
+        description: result.rows[0].description,
+        category: result.rows[0].category,
+        unitPrice: parseFloat(result.rows[0].unit_price),
+        reorderLevel: result.rows[0].reorder_level
+      },
+      inventory: {
+        totalAvailable: totalAvailable,
+        totalOnHand: totalOnHand,
+        totalReserved: totalReserved,
+        warehouses: result.rows.map(row => ({
+          warehouseName: row.warehouse_name,
+          warehouseLocation: row.warehouse_location,
+          warehouseCode: row.warehouse_code,
+          quantityOnHand: parseInt(row.quantity_on_hand),
+          quantityReserved: parseInt(row.quantity_reserved),
+          quantityAvailable: parseInt(row.quantity_available),
+          stockStatus: row.stock_status
+        }))
+      },
+      requestedBy: sfContext.userName,
+      requestedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error checking stock:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Action 5: Get Low Stock Alerts
+app.post('/api/inventory/low-stock-alerts', validateUserPlusMode, async (req, res) => {
+  try {
+    const { category, warehouse_code, limit = 20 } = req.body;
+    const sfContext = req.salesforceContext;
+
+    console.log('[User Plus Mode] User ' + sfContext.userName + ' fetching low stock alerts');
+
+    let query = 'SELECT * FROM low_stock_alerts WHERE 1=1';
+    const params = [];
+    let paramCount = 0;
+
+    if (category) {
+      paramCount++;
+      query += ' AND category = $' + paramCount;
+      params.push(category);
+    }
+
+    if (warehouse_code) {
+      paramCount++;
+      query += ' AND warehouse_code = $' + paramCount;
+      params.push(warehouse_code);
+    }
+
+    paramCount++;
+    query += ' LIMIT $' + paramCount;
+    params.push(limit);
+
+    const result = await pool.query(query, params);
+
+    res.json({
+      success: true,
+      alerts: result.rows.map(row => ({
+        sku: row.sku,
+        productName: row.name,
+        category: row.category,
+        warehouseName: row.warehouse_name,
+        warehouseCode: row.warehouse_code,
+        quantityOnHand: parseInt(row.quantity_on_hand),
+        quantityReserved: parseInt(row.quantity_reserved),
+        quantityAvailable: parseInt(row.quantity_available),
+        reorderLevel: parseInt(row.reorder_level),
+        unitsBelowThreshold: parseInt(row.units_below_threshold)
+      })),
+      count: result.rows.length,
+      requestedBy: sfContext.userName,
+      filters: { category, warehouse_code }
+    });
+  } catch (error) {
+    console.error('Error fetching low stock alerts:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Action 6: Get Inventory Transaction History
+app.post('/api/inventory/transaction-history', validateUserPlusMode, async (req, res) => {
+  try {
+    const { sku, days = 30, limit = 50 } = req.body;
+    const sfContext = req.salesforceContext;
+
+    console.log('[User Plus Mode] User ' + sfContext.userName + ' fetching transaction history for: ' + sku);
+
+    const result = await pool.query(
+      `SELECT
+        t.id,
+        p.sku,
+        p.name as product_name,
+        w.name as warehouse_name,
+        w.code as warehouse_code,
+        t.transaction_type,
+        t.quantity,
+        t.reference_number,
+        t.notes,
+        t.created_by,
+        t.created_at
+      FROM inventory_transactions t
+      JOIN products p ON t.product_id = p.id
+      JOIN warehouses w ON t.warehouse_id = w.id
+      WHERE p.sku = $1
+      AND t.created_at > NOW() - INTERVAL '1 day' * $2
+      ORDER BY t.created_at DESC
+      LIMIT $3`,
+      [sku, days, limit]
+    );
+
+    res.json({
+      success: true,
+      sku: sku,
+      transactions: result.rows.map(row => ({
+        transactionId: row.id,
+        productName: row.product_name,
+        warehouseName: row.warehouse_name,
+        warehouseCode: row.warehouse_code,
+        transactionType: row.transaction_type,
+        quantity: parseInt(row.quantity),
+        referenceNumber: row.reference_number,
+        notes: row.notes,
+        createdBy: row.created_by,
+        createdAt: row.created_at
+      })),
+      count: result.rows.length,
+      requestedBy: sfContext.userName,
+      periodDays: days
+    });
+  } catch (error) {
+    console.error('Error fetching transaction history:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // ===== SLACK BOT COMMANDS =====
 
 // Slash command: /customer-lookup
@@ -273,15 +512,200 @@ slackApp.command('/database-stats', async ({ ack, respond }) => {
   }
 });
 
+// Slash command: /stock
+slackApp.command('/stock', async ({ command, ack, respond }) => {
+  await ack();
+
+  const sku = command.text.trim().toUpperCase();
+
+  if (!sku) {
+    return respond({
+      text: 'Please provide a product SKU. Usage: /stock <SKU>\n\nExample: /stock LAPTOP-PRO-15'
+    });
+  }
+
+  try {
+    // Query inventory across all warehouses
+    const result = await pool.query(
+      `SELECT
+        p.sku,
+        p.name,
+        p.category,
+        p.unit_price,
+        w.name as warehouse_name,
+        w.location as warehouse_location,
+        w.code as warehouse_code,
+        i.quantity_on_hand,
+        i.quantity_reserved,
+        i.quantity_available,
+        p.reorder_level,
+        CASE
+          WHEN i.quantity_available <= p.reorder_level THEN 'LOW_STOCK'
+          WHEN i.quantity_available = 0 THEN 'OUT_OF_STOCK'
+          ELSE 'IN_STOCK'
+        END as stock_status
+      FROM products p
+      JOIN inventory i ON p.id = i.product_id
+      JOIN warehouses w ON i.warehouse_id = w.id
+      WHERE p.sku = $1
+      ORDER BY i.quantity_available DESC`,
+      [sku]
+    );
+
+    if (result.rows.length === 0) {
+      return respond({
+        text: 'Product not found: ' + sku + '\n\nPlease check the SKU and try again.'
+      });
+    }
+
+    const product = result.rows[0];
+    const totalAvailable = result.rows.reduce((sum, row) => sum + parseInt(row.quantity_available), 0);
+    const totalOnHand = result.rows.reduce((sum, row) => sum + parseInt(row.quantity_on_hand), 0);
+
+    // Build response blocks
+    const blocks = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: 'Stock Check: ' + product.sku
+        }
+      },
+      {
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: '*Product Name:*\n' + product.name },
+          { type: "mrkdwn", text: '*Category:*\n' + product.category },
+          { type: "mrkdwn", text: '*Unit Price:*\n$' + parseFloat(product.unit_price).toFixed(2) },
+          { type: "mrkdwn", text: '*Reorder Level:*\n' + product.reorder_level + ' units' }
+        ]
+      },
+      {
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: '*Total Available:*\n' + totalAvailable + ' units' },
+          { type: "mrkdwn", text: '*Total On Hand:*\n' + totalOnHand + ' units' }
+        ]
+      },
+      {
+        type: "divider"
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: '*Warehouse Breakdown:*'
+        }
+      }
+    ];
+
+    // Add warehouse details
+    result.rows.forEach(row => {
+      const statusEmoji = row.stock_status === 'IN_STOCK' ? ':white_check_mark:' :
+                         row.stock_status === 'LOW_STOCK' ? ':warning:' : ':x:';
+
+      blocks.push({
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: '*' + row.warehouse_name + '*\n' + row.warehouse_location },
+          { type: "mrkdwn", text: '*Available:* ' + row.quantity_available + ' units ' + statusEmoji },
+          { type: "mrkdwn", text: '*On Hand:* ' + row.quantity_on_hand + ' units' },
+          { type: "mrkdwn", text: '*Reserved:* ' + row.quantity_reserved + ' units' }
+        ]
+      });
+    });
+
+    // Add alert if low stock
+    if (totalAvailable <= product.reorder_level) {
+      blocks.push({
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: ':warning: *LOW STOCK ALERT:* This product is at or below the reorder level!'
+          }
+        ]
+      });
+    }
+
+    respond({ blocks });
+  } catch (error) {
+    console.error('Error checking stock:', error);
+    respond({
+      text: 'Error checking stock for ' + sku + ': ' + error.message
+    });
+  }
+});
+
+// Slash command: /low-stock
+slackApp.command('/low-stock', async ({ command, ack, respond }) => {
+  await ack();
+
+  try {
+    const result = await pool.query('SELECT * FROM low_stock_alerts LIMIT 10');
+
+    if (result.rows.length === 0) {
+      return respond({
+        text: 'No low stock alerts! All products are adequately stocked.'
+      });
+    }
+
+    const blocks = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: 'Low Stock Alerts'
+        }
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: 'Products at or below reorder level'
+          }
+        ]
+      },
+      {
+        type: "divider"
+      }
+    ];
+
+    result.rows.forEach(alert => {
+      blocks.push({
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: '*SKU:*\n' + alert.sku },
+          { type: "mrkdwn", text: '*Product:*\n' + alert.name },
+          { type: "mrkdwn", text: '*Warehouse:*\n' + alert.warehouse_name },
+          { type: "mrkdwn", text: '*Available:*\n' + alert.quantity_available + ' / ' + alert.reorder_level + ' units' }
+        ]
+      });
+      blocks.push({ type: "divider" });
+    });
+
+    respond({ blocks });
+  } catch (error) {
+    console.error('Error fetching low stock alerts:', error);
+    respond({
+      text: 'Error fetching low stock alerts: ' + error.message
+    });
+  }
+});
+
 // Welcome message
 slackApp.event('app_mention', async ({ event, say }) => {
   await say({
     text: 'Hi <@' + event.user + '>! I am your AppLink-powered bot connected to Salesforce Agentforce!\n\n' +
-          '*Available commands:*\n' +
+          '*Customer Commands:*\n' +
           '• /customer-lookup <name or email> - Search for customers\n' +
           '• /database-stats - View database statistics\n\n' +
+          '*ERP Inventory Commands:*\n' +
+          '• /stock <SKU> - Check inventory levels for a product\n' +
+          '• /low-stock - View products with low inventory\n\n' +
           '*AppLink Integration:*\n' +
-          'This app is secured with User Plus Mode, allowing Agentforce to query customer data while maintaining Salesforce user permissions.'
+          'This app is secured with User Plus Mode, allowing Agentforce to query customer and inventory data while maintaining Salesforce user permissions.'
   });
 });
 
@@ -301,9 +725,14 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log('Express server listening on port ' + PORT);
   console.log('AppLink API endpoints available at:');
+  console.log('Customer Endpoints:');
   console.log('   - POST /api/customers/search');
   console.log('   - POST /api/customers/:customerId/orders');
   console.log('   - POST /api/analytics/customer-insights');
+  console.log('ERP Inventory Endpoints:');
+  console.log('   - POST /api/inventory/check-stock');
+  console.log('   - POST /api/inventory/low-stock-alerts');
+  console.log('   - POST /api/inventory/transaction-history');
 });
 
 // Database initialization check
