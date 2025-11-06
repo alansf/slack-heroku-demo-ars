@@ -1,4 +1,4 @@
-const { App } = require('@slack/bolt');
+const { App, ExpressReceiver } = require('@slack/bolt');
 const express = require('express');
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
@@ -10,25 +10,29 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Initialize Slack Bolt app (optional - only if credentials are provided)
+// Initialize Slack Bolt + Express in a single server (avoid port conflicts on Heroku)
 let slackApp = null;
+let app = null;
 const hasSlackCredentials = process.env.SLACK_BOT_TOKEN && process.env.SLACK_SIGNING_SECRET;
 
 if (hasSlackCredentials) {
+  const receiver = new ExpressReceiver({
+    signingSecret: process.env.SLACK_SIGNING_SECRET,
+    endpoints: '/slack/events'
+  });
   slackApp = new App({
     token: process.env.SLACK_BOT_TOKEN,
-    signingSecret: process.env.SLACK_SIGNING_SECRET,
-    socketMode: false,
-    port: process.env.PORT || 3000
+    receiver
   });
-  console.log('Slack credentials found - Slack integration enabled');
+  app = receiver.app;
+  console.log('Slack credentials found - Slack integration enabled (ExpressReceiver)');
 } else {
   console.log('Slack credentials not found - Running without Slack integration');
   console.log('Set SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET to enable Slack features');
+  app = express();
 }
 
-// Create Express app for AppLink endpoints
-const app = express();
+// Create Express app middleware for AppLink endpoints and UI
 app.use(bodyParser.json());
 
 // Serve static files
@@ -931,17 +935,7 @@ slackApp.event('app_mention', async ({ event, say }) => {
 
 const PORT = process.env.PORT || 3000;
 
-// Start Slack Bolt receiver (only if configured)
-if (slackApp) {
-  (async () => {
-    await slackApp.start();
-    console.log('Slack Bolt app is running!');
-    console.log('User Plus Mode: Active');
-    console.log('AppLink endpoints ready for Agentforce Actions');
-  })();
-}
-
-// Start Express server for AppLink endpoints
+// Start single Express server (Slack Bolt mounted if configured)
 app.listen(PORT, () => {
   console.log('Express server listening on port ' + PORT);
   console.log('AppLink API endpoints available at:');
