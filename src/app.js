@@ -10,13 +10,22 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Initialize Slack Bolt app
-const slackApp = new App({
-  token: process.env.SLACK_BOT_TOKEN,
-  signingSecret: process.env.SLACK_SIGNING_SECRET,
-  socketMode: false,
-  port: process.env.PORT || 3000
-});
+// Initialize Slack Bolt app (optional - only if credentials are provided)
+let slackApp = null;
+const hasSlackCredentials = process.env.SLACK_BOT_TOKEN && process.env.SLACK_SIGNING_SECRET;
+
+if (hasSlackCredentials) {
+  slackApp = new App({
+    token: process.env.SLACK_BOT_TOKEN,
+    signingSecret: process.env.SLACK_SIGNING_SECRET,
+    socketMode: false,
+    port: process.env.PORT || 3000
+  });
+  console.log('Slack credentials found - Slack integration enabled');
+} else {
+  console.log('Slack credentials not found - Running without Slack integration');
+  console.log('Set SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET to enable Slack features');
+}
 
 // Create Express app for AppLink endpoints
 const app = express();
@@ -326,6 +335,12 @@ app.post('/api/inventory/update', async (req, res) => {
 // Helper function to send Slack notifications
 async function sendSlackNotification(message, details) {
   try {
+    // Skip if Slack is not configured
+    if (!slackApp) {
+      console.log('[Slack Notification] Slack not configured, skipping notification');
+      return;
+    }
+
     if (!process.env.SLACK_NOTIFICATION_CHANNEL) {
       console.log('[Slack Notification] No channel configured, skipping notification');
       return;
@@ -612,6 +627,9 @@ app.post('/api/inventory/transaction-history', validateUserPlusMode, async (req,
 });
 
 // ===== SLACK BOT COMMANDS =====
+
+// Only register Slack commands if Slack is configured
+if (slackApp) {
 
 // Slash command: /customer-lookup
 slackApp.command('/customer-lookup', async ({ command, ack, respond }) => {
@@ -907,17 +925,21 @@ slackApp.event('app_mention', async ({ event, say }) => {
   });
 });
 
+} // End of Slack commands/events conditional block
+
 // ===== SERVER STARTUP =====
 
 const PORT = process.env.PORT || 3000;
 
-// Start Slack Bolt receiver
-(async () => {
-  await slackApp.start();
-  console.log('Slack Bolt app is running!');
-  console.log('User Plus Mode: Active');
-  console.log('AppLink endpoints ready for Agentforce Actions');
-})();
+// Start Slack Bolt receiver (only if configured)
+if (slackApp) {
+  (async () => {
+    await slackApp.start();
+    console.log('Slack Bolt app is running!');
+    console.log('User Plus Mode: Active');
+    console.log('AppLink endpoints ready for Agentforce Actions');
+  })();
+}
 
 // Start Express server for AppLink endpoints
 app.listen(PORT, () => {
