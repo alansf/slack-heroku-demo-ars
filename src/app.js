@@ -48,6 +48,17 @@ app.get('/', (req, res) => {
   });
 });
 
+// Friendly routes for inventory UI and favicon
+app.get('/inventory', (req, res) => {
+  res.redirect('/inventory.html');
+});
+app.get('/inventory/', (req, res) => {
+  res.redirect('/inventory.html');
+});
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
 // AppLink User Plus Mode Authentication Middleware
 // User Plus Mode validates both the Salesforce user AND app credentials
 const validateUserPlusMode = (req, res, next) => {
