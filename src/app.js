@@ -22,9 +22,12 @@ const slackApp = new App({
 const app = express();
 app.use(bodyParser.json());
 
+// Serve static files
+app.use(express.static('public'));
+
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     status: 'healthy',
     app: 'Slack AppLink Bot',
     mode: 'User Plus Mode',
@@ -175,6 +178,201 @@ app.post('/api/analytics/customer-insights', validateUserPlusMode, async (req, r
 });
 
 // ===== ERP INVENTORY GATEWAY ENDPOINTS =====
+
+// GET /api/inventory/list - List all products with inventory (for UI)
+app.get('/api/inventory/list', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        p.id,
+        p.sku,
+        p.name,
+        p.description,
+        p.category,
+        p.unit_price,
+        p.reorder_level,
+        json_agg(
+          json_build_object(
+            'warehouseName', w.name,
+            'warehouseLocation', w.location,
+            'warehouseCode', w.code,
+            'quantityOnHand', i.quantity_on_hand,
+            'quantityReserved', i.quantity_reserved,
+            'quantityAvailable', i.quantity_available,
+            'stockStatus', CASE
+              WHEN i.quantity_available <= p.reorder_level THEN 'LOW_STOCK'
+              WHEN i.quantity_available = 0 THEN 'OUT_OF_STOCK'
+              ELSE 'IN_STOCK'
+            END
+          )
+        ) as warehouses
+      FROM products p
+      LEFT JOIN inventory i ON p.id = i.product_id
+      LEFT JOIN warehouses w ON i.warehouse_id = w.id
+      GROUP BY p.id
+      ORDER BY p.category, p.name
+    `);
+
+    res.json({
+      success: true,
+      products: result.rows.map(row => ({
+        id: row.id,
+        sku: row.sku,
+        name: row.name,
+        description: row.description,
+        category: row.category,
+        unitPrice: parseFloat(row.unit_price),
+        reorderLevel: row.reorder_level,
+        warehouses: row.warehouses || []
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching inventory list:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// POST /api/inventory/update - Update inventory quantity (for UI)
+app.post('/api/inventory/update', async (req, res) => {
+  try {
+    const { sku, warehouseCode, change } = req.body;
+
+    console.log('[UI Update] Updating inventory for ' + sku + ' at ' + warehouseCode + ' by ' + change);
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const inventoryResult = await client.query(`
+        UPDATE inventory
+        SET quantity_on_hand = quantity_on_hand + $1,
+            last_stock_check = NOW()
+        FROM products p, warehouses w
+        WHERE inventory.product_id = p.id
+        AND inventory.warehouse_id = w.id
+        AND p.sku = $2
+        AND w.code = $3
+        RETURNING
+          p.name as product_name,
+          w.name as warehouse_name,
+          inventory.quantity_on_hand,
+          inventory.quantity_available
+      `, [change, sku, warehouseCode]);
+
+      if (inventoryResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({
+          success: false,
+          error: 'Product or warehouse not found'
+        });
+      }
+
+      const newInventory = inventoryResult.rows[0];
+
+      await client.query(`
+        INSERT INTO inventory_transactions (product_id, warehouse_id, transaction_type, quantity, reference_number, notes, created_by)
+        SELECT p.id, w.id, $1, $2, $3, $4, 'web_ui'
+        FROM products p, warehouses w
+        WHERE p.sku = $5 AND w.code = $6
+      `, [
+        change > 0 ? 'RECEIPT' : 'ADJUSTMENT',
+        change,
+        'WEB-UI-' + Date.now(),
+        'Updated via web UI',
+        sku,
+        warehouseCode
+      ]);
+
+      await client.query('COMMIT');
+
+      const message = change > 0
+        ? 'Received ' + change + ' units of ' + newInventory.product_name + ' at ' + newInventory.warehouse_name
+        : 'Removed ' + Math.abs(change) + ' units of ' + newInventory.product_name + ' from ' + newInventory.warehouse_name;
+
+      await sendSlackNotification(message, {
+        product: newInventory.product_name,
+        warehouse: newInventory.warehouse_name,
+        change: change,
+        newQuantity: parseInt(newInventory.quantity_on_hand),
+        available: parseInt(newInventory.quantity_available),
+        sku: sku
+      });
+
+      res.json({
+        success: true,
+        message: message,
+        newQuantity: parseInt(newInventory.quantity_on_hand),
+        available: parseInt(newInventory.quantity_available)
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating inventory:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Helper function to send Slack notifications
+async function sendSlackNotification(message, details) {
+  try {
+    if (!process.env.SLACK_NOTIFICATION_CHANNEL) {
+      console.log('[Slack Notification] No channel configured, skipping notification');
+      return;
+    }
+
+    const emoji = details.change > 0 ? ':package:' : ':outbox_tray:';
+    const color = details.change > 0 ? '#28a745' : '#ffc107';
+
+    await slackApp.client.chat.postMessage({
+      token: process.env.SLACK_BOT_TOKEN,
+      channel: process.env.SLACK_NOTIFICATION_CHANNEL,
+      text: emoji + ' Inventory Update: ' + message,
+      blocks: [
+        {
+          type: 'header',
+          text: {
+            type: 'plain_text',
+            text: emoji + ' Inventory Update'
+          }
+        },
+        {
+          type: 'section',
+          fields: [
+            { type: 'mrkdwn', text: '*Product:*\n' + details.product },
+            { type: 'mrkdwn', text: '*SKU:*\n' + details.sku },
+            { type: 'mrkdwn', text: '*Warehouse:*\n' + details.warehouse },
+            { type: 'mrkdwn', text: '*Change:*\n' + (details.change > 0 ? '+' : '') + details.change + ' units' },
+            { type: 'mrkdwn', text: '*New On-Hand:*\n' + details.newQuantity + ' units' },
+            { type: 'mrkdwn', text: '*Available:*\n' + details.available + ' units' }
+          ]
+        },
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: 'Updated via Web UI at ' + new Date().toLocaleString()
+            }
+          ]
+        }
+      ]
+    });
+    console.log('[Slack Notification] Sent successfully');
+  } catch (error) {
+    console.error('[Slack Notification] Failed to send:', error.message);
+  }
+}
 
 // Action 4: Check Stock Levels by SKU
 app.post('/api/inventory/check-stock', validateUserPlusMode, async (req, res) => {

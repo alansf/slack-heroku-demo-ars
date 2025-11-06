@@ -126,65 +126,67 @@ INSERT INTO warehouses (name, location, code) VALUES
 ('Southern Distribution', 'Dallas, TX', 'WH-DL-004')
 ON CONFLICT (code) DO NOTHING;
 
--- Insert product data
+-- Insert product data - Semiconductor Manufacturing Components
 INSERT INTO products (sku, name, description, category, unit_price, reorder_level) VALUES
-('LAPTOP-PRO-15', 'Professional Laptop 15"', 'High-performance laptop for business use', 'Electronics', 1299.99, 15),
-('DESK-CHAIR-ERG', 'Ergonomic Office Chair', 'Adjustable ergonomic chair with lumbar support', 'Furniture', 349.99, 10),
-('MONITOR-4K-27', '4K Monitor 27"', 'Ultra HD 4K display for professionals', 'Electronics', 599.99, 20),
-('KEYBOARD-MECH', 'Mechanical Keyboard', 'RGB mechanical keyboard with cherry switches', 'Electronics', 149.99, 25),
-('MOUSE-WIRELESS', 'Wireless Mouse', 'Ergonomic wireless mouse with precision tracking', 'Electronics', 79.99, 30),
-('DESK-LAMP-LED', 'LED Desk Lamp', 'Adjustable LED lamp with color temperature control', 'Office Supplies', 89.99, 15),
-('NOTEBOOK-A4', 'Premium Notebook A4', 'High-quality paper notebook for note-taking', 'Office Supplies', 12.99, 50),
-('WEBCAM-HD', 'HD Webcam 1080p', 'Full HD webcam for video conferencing', 'Electronics', 129.99, 20),
-('HEADSET-NC', 'Noise Cancelling Headset', 'Professional headset with active noise cancellation', 'Electronics', 199.99, 15),
-('DOCKING-STATION', 'Universal Docking Station', 'Multi-port docking station for laptops', 'Electronics', 249.99, 12),
-('PHONE-STAND', 'Adjustable Phone Stand', 'Aluminum phone stand for desk', 'Accessories', 29.99, 40),
-('CABLE-USB-C', 'USB-C Cable 6ft', 'High-speed USB-C charging cable', 'Accessories', 19.99, 100)
+('GPU-H100-80GB', 'NVIDIA H100 80GB GPU', 'High-performance AI training GPU with 80GB HBM3 memory', 'GPU Chips', 32999.99, 5),
+('GPU-A100-40GB', 'NVIDIA A100 40GB GPU', 'Enterprise datacenter GPU for AI workloads', 'GPU Chips', 11999.99, 10),
+('GPU-L40S-48GB', 'NVIDIA L40S 48GB GPU', 'Multi-workload GPU for AI inference and graphics', 'GPU Chips', 8999.99, 8),
+('CHEM-PHOTORESIST-EUV', 'EUV Photoresist Chemical', 'Extreme ultraviolet photoresist for 5nm process', 'Chemicals', 45000.00, 3),
+('CHEM-ETCHANT-SILICON', 'Silicon Etchant Solution', 'High-purity silicon etchant for wafer processing', 'Chemicals', 12500.00, 5),
+('CHEM-DOPANT-BORON', 'Boron Dopant Material', 'Ultra-pure boron for p-type doping', 'Chemicals', 28000.00, 2),
+('RACK-GPU-8U', 'GPU Server Rack 8U', '8U rack-mount chassis for 8x GPU configuration', 'Server Hardware', 15999.99, 4),
+('RACK-STORAGE-42U', 'Storage Server Rack 42U', 'Full 42U rack for high-density storage', 'Server Hardware', 8499.99, 6),
+('WAFER-SILICON-300MM', '300mm Silicon Wafer', 'Prime grade 300mm silicon wafer substrate', 'Wafer Materials', 1200.00, 50),
+('MASK-RETICLE-EUV', 'EUV Lithography Mask', 'Extreme ultraviolet lithography reticle', 'Manufacturing Tools', 150000.00, 2),
+('COOLANT-LIQUID-IMMERSION', 'Liquid Immersion Coolant', 'Dielectric cooling fluid for GPU servers', 'Cooling Systems', 3500.00, 15),
+('PSU-REDUNDANT-3KW', 'Redundant Power Supply 3KW', 'Hot-swap redundant PSU for GPU servers', 'Power Systems', 2499.99, 10)
 ON CONFLICT (sku) DO NOTHING;
 
 -- Insert inventory data (distributed across warehouses)
 INSERT INTO inventory (product_id, warehouse_id, quantity_on_hand, quantity_reserved) VALUES
--- Main Distribution Center (WH-SF-001)
-(1, 1, 45, 5),   -- LAPTOP-PRO-15: 45 on hand, 5 reserved = 40 available
-(2, 1, 28, 3),   -- DESK-CHAIR-ERG: 28 on hand, 3 reserved = 25 available
-(3, 1, 67, 7),   -- MONITOR-4K-27: 67 on hand, 7 reserved = 60 available
-(4, 1, 120, 15), -- KEYBOARD-MECH: 120 on hand, 15 reserved = 105 available
-(5, 1, 85, 10),  -- MOUSE-WIRELESS: 85 on hand, 10 reserved = 75 available
-(6, 1, 42, 2),   -- DESK-LAMP-LED: 42 on hand, 2 reserved = 40 available
-(7, 1, 250, 20), -- NOTEBOOK-A4: 250 on hand, 20 reserved = 230 available
-(8, 1, 55, 5),   -- WEBCAM-HD: 55 on hand, 5 reserved = 50 available
-(9, 1, 38, 3),   -- HEADSET-NC: 38 on hand, 3 reserved = 35 available
-(10, 1, 30, 5),  -- DOCKING-STATION: 30 on hand, 5 reserved = 25 available
-(11, 1, 95, 5),  -- PHONE-STAND: 95 on hand, 5 reserved = 90 available
-(12, 1, 450, 50), -- CABLE-USB-C: 450 on hand, 50 reserved = 400 available
+-- Main Distribution Center - San Francisco (WH-SF-001)
+(1, 1, 12, 2),   -- GPU-H100-80GB: 12 on hand, 2 reserved = 10 available
+(2, 1, 28, 3),   -- GPU-A100-40GB: 28 on hand, 3 reserved = 25 available
+(3, 1, 35, 5),   -- GPU-L40S-48GB: 35 on hand, 5 reserved = 30 available
+(4, 1, 8, 1),    -- CHEM-PHOTORESIST-EUV: 8 on hand, 1 reserved = 7 available
+(5, 1, 15, 2),   -- CHEM-ETCHANT-SILICON: 15 on hand, 2 reserved = 13 available
+(6, 1, 6, 1),    -- CHEM-DOPANT-BORON: 6 on hand, 1 reserved = 5 available
+(7, 1, 18, 3),   -- RACK-GPU-8U: 18 on hand, 3 reserved = 15 available
+(8, 1, 25, 2),   -- RACK-STORAGE-42U: 25 on hand, 2 reserved = 23 available
+(9, 1, 450, 50), -- WAFER-SILICON-300MM: 450 on hand, 50 reserved = 400 available
+(10, 1, 5, 1),   -- MASK-RETICLE-EUV: 5 on hand, 1 reserved = 4 available
+(11, 1, 85, 10), -- COOLANT-LIQUID-IMMERSION: 85 on hand, 10 reserved = 75 available
+(12, 1, 42, 5),  -- PSU-REDUNDANT-3KW: 42 on hand, 5 reserved = 37 available
 
--- East Coast Warehouse (WH-NY-002)
-(1, 2, 32, 2),   -- LAPTOP-PRO-15: 32 on hand, 2 reserved = 30 available
-(2, 2, 18, 0),   -- DESK-CHAIR-ERG: 18 on hand, 0 reserved = 18 available
-(3, 2, 45, 5),   -- MONITOR-4K-27: 45 on hand, 5 reserved = 40 available
-(4, 2, 90, 10),  -- KEYBOARD-MECH: 90 on hand, 10 reserved = 80 available
-(5, 2, 70, 5),   -- MOUSE-WIRELESS: 70 on hand, 5 reserved = 65 available
-(6, 2, 25, 0),   -- DESK-LAMP-LED: 25 on hand, 0 reserved = 25 available
-(7, 2, 180, 15), -- NOTEBOOK-A4: 180 on hand, 15 reserved = 165 available
-(8, 2, 40, 3),   -- WEBCAM-HD: 40 on hand, 3 reserved = 37 available
+-- East Coast Warehouse - New York (WH-NY-002)
+(1, 2, 8, 1),    -- GPU-H100-80GB: 8 on hand, 1 reserved = 7 available
+(2, 2, 22, 2),   -- GPU-A100-40GB: 22 on hand, 2 reserved = 20 available
+(3, 2, 28, 3),   -- GPU-L40S-48GB: 28 on hand, 3 reserved = 25 available
+(4, 2, 6, 0),    -- CHEM-PHOTORESIST-EUV: 6 on hand, 0 reserved = 6 available
+(5, 2, 12, 1),   -- CHEM-ETCHANT-SILICON: 12 on hand, 1 reserved = 11 available
+(7, 2, 14, 2),   -- RACK-GPU-8U: 14 on hand, 2 reserved = 12 available
+(8, 2, 20, 3),   -- RACK-STORAGE-42U: 20 on hand, 3 reserved = 17 available
+(9, 2, 380, 40), -- WAFER-SILICON-300MM: 380 on hand, 40 reserved = 340 available
 
--- Midwest Hub (WH-CH-003)
-(1, 3, 28, 3),   -- LAPTOP-PRO-15: 28 on hand, 3 reserved = 25 available
-(2, 3, 15, 2),   -- DESK-CHAIR-ERG: 15 on hand, 2 reserved = 13 available
-(3, 3, 50, 4),   -- MONITOR-4K-27: 50 on hand, 4 reserved = 46 available
-(4, 3, 110, 12), -- KEYBOARD-MECH: 110 on hand, 12 reserved = 98 available
-(5, 3, 65, 8),   -- MOUSE-WIRELESS: 65 on hand, 8 reserved = 57 available
-(9, 3, 22, 2),   -- HEADSET-NC: 22 on hand, 2 reserved = 20 available
-(10, 3, 18, 3),  -- DOCKING-STATION: 18 on hand, 3 reserved = 15 available
+-- Midwest Hub - Chicago (WH-CH-003)
+(1, 3, 6, 1),    -- GPU-H100-80GB: 6 on hand, 1 reserved = 5 available
+(2, 3, 18, 2),   -- GPU-A100-40GB: 18 on hand, 2 reserved = 16 available
+(3, 3, 24, 4),   -- GPU-L40S-48GB: 24 on hand, 4 reserved = 20 available
+(5, 3, 10, 1),   -- CHEM-ETCHANT-SILICON: 10 on hand, 1 reserved = 9 available
+(7, 3, 12, 1),   -- RACK-GPU-8U: 12 on hand, 1 reserved = 11 available
+(11, 3, 60, 5),  -- COOLANT-LIQUID-IMMERSION: 60 on hand, 5 reserved = 55 available
+(12, 3, 35, 3),  -- PSU-REDUNDANT-3KW: 35 on hand, 3 reserved = 32 available
 
--- Southern Distribution (WH-DL-004)
-(1, 4, 8, 1),    -- LAPTOP-PRO-15: 8 on hand, 1 reserved = 7 available (LOW STOCK!)
-(2, 4, 5, 0),    -- DESK-CHAIR-ERG: 5 on hand, 0 reserved = 5 available (LOW STOCK!)
-(3, 4, 35, 3),   -- MONITOR-4K-27: 35 on hand, 3 reserved = 32 available
-(4, 4, 75, 8),   -- KEYBOARD-MECH: 75 on hand, 8 reserved = 67 available
-(5, 4, 55, 5),   -- MOUSE-WIRELESS: 55 on hand, 5 reserved = 50 available
-(11, 4, 60, 5),  -- PHONE-STAND: 60 on hand, 5 reserved = 55 available
-(12, 4, 300, 30) -- CABLE-USB-C: 300 on hand, 30 reserved = 270 available
+-- Southern Distribution - Dallas (WH-DL-004)
+(1, 4, 3, 0),    -- GPU-H100-80GB: 3 on hand, 0 reserved = 3 available (LOW STOCK!)
+(2, 4, 7, 1),    -- GPU-A100-40GB: 7 on hand, 1 reserved = 6 available (LOW STOCK!)
+(3, 4, 15, 2),   -- GPU-L40S-48GB: 15 on hand, 2 reserved = 13 available
+(4, 4, 2, 0),    -- CHEM-PHOTORESIST-EUV: 2 on hand, 0 reserved = 2 available (LOW STOCK!)
+(6, 4, 1, 0),    -- CHEM-DOPANT-BORON: 1 on hand, 0 reserved = 1 available (CRITICAL LOW!)
+(7, 4, 8, 1),    -- RACK-GPU-8U: 8 on hand, 1 reserved = 7 available
+(9, 4, 320, 30), -- WAFER-SILICON-300MM: 320 on hand, 30 reserved = 290 available
+(11, 4, 45, 5),  -- COOLANT-LIQUID-IMMERSION: 45 on hand, 5 reserved = 40 available
+(12, 4, 28, 2)   -- PSU-REDUNDANT-3KW: 28 on hand, 2 reserved = 26 available
 ON CONFLICT (product_id, warehouse_id) DO NOTHING;
 
 -- Insert sample inventory transactions

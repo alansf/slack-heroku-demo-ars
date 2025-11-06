@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semiconductor Manufacturing Inventory</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        select, input {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 20px;
+        }
+        
+        .product-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        
+        .product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+        
+        .product-sku {
+            font-family: 'Courier New', monospace;
+            background: #f0f0f0;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .product-name {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .product-category {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-bottom: 10px;
+        }
+        
+        .product-price {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        
+        .warehouse-section {
+            margin-top: 20px;
+        }
+        
+        .warehouse-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .warehouse-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .stock-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .stock-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .stock-badge.in-stock {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .stock-badge.low-stock {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .stock-badge.out-of-stock {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .quantity-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .qty-display {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #333;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: scale(1.05);
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            z-index: 1000;
+            animation: slideIn 0.3s;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .toast.success {
+            border-left: 4px solid #28a745;
+        }
+        
+        .toast.error {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Semiconductor Manufacturing Inventory</h1>
+            <p class="subtitle">Real-time inventory management for GPU chips and manufacturing components</p>
+        </header>
+        
+        <div class="filters">
+            <select id="categoryFilter">
+                <option value="">All Categories</option>
+            </select>
+            <select id="warehouseFilter">
+                <option value="">All Warehouses</option>
+            </select>
+            <input type="text" id="searchFilter" placeholder="Search products...">
+            <button class="btn btn-success" onclick="loadInventory()">Refresh</button>
+        </div>
+        
+        <div id="inventoryGrid" class="inventory-grid"></div>
+    </div>
+
+    <script>
+        let inventory = [];
+        
+        async function loadInventory() {
+            try {
+                const response = await fetch('/api/inventory/list');
+                const data = await response.json();
+                inventory = data.products;
+                
+                populateFilters();
+                renderInventory();
+            } catch (error) {
+                showToast('Error loading inventory: ' + error.message, 'error');
+            }
+        }
+        
+        function populateFilters() {
+            const categories = [...new Set(inventory.map(p => p.category))];
+            const warehouses = [...new Set(inventory.flatMap(p => p.warehouses.map(w => w.warehouseName)))];
+            
+            const categoryFilter = document.getElementById('categoryFilter');
+            categoryFilter.innerHTML = '<option value="">All Categories</option>' + 
+                categories.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+            
+            const warehouseFilter = document.getElementById('warehouseFilter');
+            warehouseFilter.innerHTML = '<option value="">All Warehouses</option>' + 
+                warehouses.map(w => '<option value="' + w + '">' + w + '</option>').join('');
+        }
+        
+        function renderInventory() {
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const warehouseFilter = document.getElementById('warehouseFilter').value;
+            const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+            
+            let filtered = inventory.filter(product => {
+                if (categoryFilter && product.category !== categoryFilter) return false;
+                if (searchFilter && !product.name.toLowerCase().includes(searchFilter) && 
+                    !product.sku.toLowerCase().includes(searchFilter)) return false;
+                if (warehouseFilter) {
+                    const hasWarehouse = product.warehouses.some(w => w.warehouseName === warehouseFilter);
+                    if (!hasWarehouse) return false;
+                }
+                return true;
+            });
+            
+            const grid = document.getElementById('inventoryGrid');
+            grid.innerHTML = filtered.map(product => createProductCard(product)).join('');
+        }
+        
+        function createProductCard(product) {
+            return '<div class="product-card">' +
+                '<div class="product-header">' +
+                    '<div>' +
+                        '<div class="product-sku">' + product.sku + '</div>' +
+                        '<div class="product-name">' + product.name + '</div>' +
+                        '<span class="product-category">' + product.category + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="product-price">$' + product.unitPrice.toLocaleString() + '</div>' +
+                '<div class="warehouse-section">' +
+                    product.warehouses.map(warehouse => createWarehouseItem(product.sku, warehouse)).join('') +
+                '</div>' +
+            '</div>';
+        }
+        
+        function createWarehouseItem(sku, warehouse) {
+            const statusClass = warehouse.stockStatus === 'IN_STOCK' ? 'in-stock' : 
+                               warehouse.stockStatus === 'LOW_STOCK' ? 'low-stock' : 'out-of-stock';
+            const statusText = warehouse.stockStatus.replace('_', ' ');
+            
+            return '<div class="warehouse-item">' +
+                '<div class="warehouse-name">' + warehouse.warehouseName + ' (' + warehouse.warehouseCode + ')</div>' +
+                '<div class="stock-info">' +
+                    '<span class="stock-badge ' + statusClass + '">' + statusText + '</span>' +
+                    '<span>Available: ' + warehouse.quantityAvailable + ' | On Hand: ' + warehouse.quantityOnHand + '</span>' +
+                '</div>' +
+                '<div class="quantity-controls">' +
+                    '<button class="btn btn-secondary" onclick="updateQuantity(\'' + sku + '\', \'' + warehouse.warehouseCode + '\', -1)">- 1</button>' +
+                    '<button class="btn btn-secondary" onclick="updateQuantity(\'' + sku + '\', \'' + warehouse.warehouseCode + '\', -5)">- 5</button>' +
+                    '<span class="qty-display">' + warehouse.quantityOnHand + '</span>' +
+                    '<button class="btn btn-primary" onclick="updateQuantity(\'' + sku + '\', \'' + warehouse.warehouseCode + '\', 1)">+ 1</button>' +
+                    '<button class="btn btn-primary" onclick="updateQuantity(\'' + sku + '\', \'' + warehouse.warehouseCode + '\', 5)">+ 5</button>' +
+                '</div>' +
+            '</div>';
+        }
+        
+        async function updateQuantity(sku, warehouseCode, change) {
+            try {
+                const response = await fetch('/api/inventory/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sku, warehouseCode, change })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Inventory updated! New quantity: ' + data.newQuantity, 'success');
+                    await loadInventory();
+                } else {
+                    showToast('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showToast('Error updating inventory: ' + error.message, 'error');
+            }
+        }
+        
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        document.getElementById('categoryFilter').addEventListener('change', renderInventory);
+        document.getElementById('warehouseFilter').addEventListener('change', renderInventory);
+        document.getElementById('searchFilter').addEventListener('input', renderInventory);
+        
+        loadInventory();
+    </script>
+</body>
+</html>
