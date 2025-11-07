@@ -306,6 +306,15 @@ paths:
       tags:
         - Inventory
       security: []
+      
+  /slack/events:
+    post:
+      summary: Slack Events API endpoint
+      description: Endpoint for Slack Events API, including URL verification, slash commands, and event subscriptions
+      operationId: slackEvents
+      tags:
+        - Slack
+      security: []
       requestBody:
         required: true
         content:

@@ -18,13 +18,27 @@ const hasSlackCredentials = process.env.SLACK_BOT_TOKEN && process.env.SLACK_SIG
 if (hasSlackCredentials) {
   const receiver = new ExpressReceiver({
     signingSecret: process.env.SLACK_SIGNING_SECRET,
-    endpoints: '/slack/events'
+    endpoints: '/slack/events',
+    // Add explicit handling of the challenge parameter
+    processBeforeResponse: true
   });
   slackApp = new App({
     token: process.env.SLACK_BOT_TOKEN,
     receiver
   });
   app = receiver.app;
+  
+  // Add explicit route handler for Slack URL verification
+  app.post('/slack/events', (req, res) => {
+    // Check if this is a challenge request from Slack
+    if (req.body && req.body.type === 'url_verification') {
+      console.log('Received Slack URL verification challenge');
+      // Respond with the challenge value
+      return res.json({ challenge: req.body.challenge });
+    }
+    // For other requests, let the Bolt framework handle it
+    return res.status(200).end();
+  });
   console.log('Slack credentials found - Slack integration enabled (ExpressReceiver)');
 } else {
   console.log('Slack credentials not found - Running without Slack integration');
