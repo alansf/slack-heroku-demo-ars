@@ -62,7 +62,9 @@ if (hasSlackCredentials) {
 }
 
 // Create Express app middleware for AppLink endpoints and UI
-app.use(bodyParser.json());
+// IMPORTANT: Do NOT apply JSON parser globally; Slack uses urlencoded with signature verification.
+// Limit JSON body parsing to our REST API routes to avoid interfering with Slack requests.
+app.use('/api', bodyParser.json());
 
 // We've moved the URL verification handler above the Bolt initialization
 // to ensure it runs first, so we can remove this duplicate handler
