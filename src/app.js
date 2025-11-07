@@ -10,64 +10,33 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Create a minimal Express app
-const app = express();
-
-// Use a simple JSON body parser at the beginning
-app.use(express.json());
-
-// CRITICAL: Create a direct handler for Slack URL verification
-// This must be the very first route defined, before any other middleware
-app.post('/slack/events', (req, res) => {
-  console.log('Received request to /slack/events');
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
-  
-  // Check if this is a challenge request from Slack
-  if (req.body && req.body.type === 'url_verification') {
-    const challenge = req.body.challenge;
-    console.log('Responding to Slack URL verification challenge with:', challenge);
-    
-    // Return ONLY the challenge string value directly
-    return res.status(200).send(challenge);
-  }
-  
-  // For any other requests, pass to the next handler
-  // We'll set up a second handler for this route later
-  return res.status(200).json({ status: 'ok' });
-});
-
-// Initialize Slack Bolt with a different endpoint to avoid conflict
+// Initialize Slack Bolt via ExpressReceiver at the standard endpoint
 let slackApp = null;
+let app = null;
 const hasSlackCredentials = process.env.SLACK_BOT_TOKEN && process.env.SLACK_SIGNING_SECRET;
 
 if (hasSlackCredentials) {
-  // Use a different endpoint for Slack Bolt to avoid conflict with our verification handler
   const receiver = new ExpressReceiver({
     signingSecret: process.env.SLACK_SIGNING_SECRET,
-    endpoints: '/slack/bolt-events', // Changed from /slack/events to avoid conflict
-    app: app,
+    endpoints: '/slack/events',
     processBeforeResponse: true
   });
   slackApp = new App({
     token: process.env.SLACK_BOT_TOKEN,
     receiver
   });
-  console.log('Slack credentials found - Slack integration enabled (ExpressReceiver)');
-  console.log('Slack Bolt endpoint: /slack/bolt-events');
-  console.log('URL verification endpoint: /slack/events');
+  app = receiver.app;
+  console.log('Slack credentials found - Slack integration enabled (ExpressReceiver at /slack/events)');
 } else {
   console.log('Slack credentials not found - Running without Slack integration');
   console.log('Set SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET to enable Slack features');
+  app = express();
 }
 
 // Create Express app middleware for AppLink endpoints and UI
 // IMPORTANT: Do NOT apply JSON parser globally; Slack uses urlencoded with signature verification.
 // Limit JSON body parsing to our REST API routes to avoid interfering with Slack requests.
 app.use('/api', bodyParser.json());
-
-// We've moved the URL verification handler above the Bolt initialization
-// to ensure it runs first, so we can remove this duplicate handler
 
 // Serve static files
 app.use(express.static('public'));
@@ -976,37 +945,7 @@ slackApp.event('app_mention', async ({ event, say }) => {
 
 } // End of Slack commands/events conditional block
 
-// Create additional verification endpoints as backup options
-app.post('/slack/verify', (req, res) => {
-  try {
-    console.log('Received request to /slack/verify');
-    console.log('Body:', req.body);
-    
-    // Check if this is a challenge request from Slack
-    if (req.body && req.body.type === 'url_verification') {
-      console.log('Responding to Slack URL verification challenge with:', req.body.challenge);
-      // Return ONLY the challenge string value directly
-      return res.status(200).send(req.body.challenge);
-    }
-    
-    // If it's not a challenge request, just return OK
-    return res.status(200).json({ status: 'ok' });
-  } catch (error) {
-    console.error('Error handling verification request:', error);
-    return res.status(500).json({ error: 'Failed to process verification request' });
-  }
-});
-
-// Add a catch-all route for any Slack verification requests
-app.post('/slack/*', (req, res, next) => {
-  // If this is a challenge request, handle it
-  if (req.body && req.body.type === 'url_verification') {
-    console.log('Catch-all: Responding to Slack URL verification challenge with:', req.body.challenge);
-    return res.status(200).send(req.body.challenge);
-  }
-  // Otherwise, continue to next handler
-  next();
-});
+// Remove ad-hoc Slack verification handlers; ExpressReceiver handles /slack/events URL verification
 
 // ===== SERVER STARTUP =====
 
