@@ -20,8 +20,10 @@ heroku addons:create heroku-applink:free -a slack-heroku-demo-ars
 ### 2. Configure User Plus Mode
 
 ```bash
-# Set authentication mode to User Plus
-heroku applink:auth:mode userplus -a slack-heroku-demo-ars
+# Note: The commands in this documentation may be outdated
+# The applink:auth:mode command is not available in the current Heroku CLI
+# Instead, configure User Plus mode through the AppLink dashboard:
+heroku addons:open heroku-applink -a slack-heroku-demo-ars
 
 # This enables both user and app credential validation
 ```
@@ -35,11 +37,13 @@ AppLink will automatically discover your API endpoints and generate:
 - Data Cloud Actions
 
 ```bash
-# View available actions
-heroku applink:actions -a slack-heroku-demo-ars
+# Note: The commands below are not available in the current Heroku CLI version
+# Instead, manage API actions through the AppLink dashboard:
+heroku addons:open heroku-applink -a slack-heroku-demo-ars
 
-# Sync actions to Salesforce
-heroku applink:actions:sync -a slack-heroku-demo-ars
+# In the dashboard you can:
+# 1. View available actions
+# 2. Sync actions to Salesforce
 ```
 
 ### 4. Configure Slack Credentials

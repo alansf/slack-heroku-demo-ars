@@ -1,0 +1,787 @@
+openapi: 3.0.3
+info:
+  title: Slack-Heroku Demo API
+  description: |
+    API for Slack-Heroku demo application that integrates with Salesforce AppLink.
+    This API provides endpoints for customer data management and ERP inventory operations.
+    
+    ## Authentication
+    This API uses User Plus Mode authentication, which validates both the Salesforce user and app credentials.
+    All API requests (except inventory UI endpoints) require the following headers:
+    - x-salesforce-user-id
+    - x-salesforce-org-id
+    - x-salesforce-user-email
+    - x-salesforce-user-name
+    - authorization: Bearer <token>
+  version: 1.0.0
+  contact:
+    name: Slack-Heroku Demo Support
+    email: support@example.com
+
+servers:
+  - url: https://slack-heroku-demo-ars.herokuapp.com
+    description: Production server
+
+security:
+  - userPlusMode: []
+
+paths:
+  /:
+    get:
+      summary: Health check endpoint
+      description: Simple health check to verify the API is running
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  app:
+                    type: string
+                    example: Slack AppLink Bot
+                  mode:
+                    type: string
+                    example: User Plus Mode
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2023-07-15T14:30:00Z'
+
+  /api/customers/search:
+    post:
+      summary: Search for customers
+      description: Search for customers in external database by name or email
+      operationId: searchCustomers
+      tags:
+        - Customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - searchTerm
+              properties:
+                searchTerm:
+                  type: string
+                  description: Name or email to search for
+                  example: alice
+                limit:
+                  type: integer
+                  description: Maximum number of results to return
+                  default: 10
+                  example: 5
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerSearchResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/customers/{customerId}/orders:
+    post:
+      summary: Get customer orders
+      description: Retrieve order history for a specific customer
+      operationId: getCustomerOrders
+      tags:
+        - Customer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: ID of the customer
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                days:
+                  type: integer
+                  description: Number of days to look back
+                  default: 30
+                  example: 30
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerOrdersResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/analytics/customer-insights:
+    post:
+      summary: Get customer insights
+      description: Get comprehensive insights about a customer
+      operationId: getCustomerInsights
+      tags:
+        - Customer
+        - Analytics
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Customer email address
+                  example: customer@example.com
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerInsightsResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/inventory/check-stock:
+    post:
+      summary: Check stock levels
+      description: Check stock levels for a product by SKU
+      operationId: checkStock
+      tags:
+        - Inventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sku
+              properties:
+                sku:
+                  type: string
+                  description: Product SKU
+                  example: LAPTOP-PRO-15
+                warehouse_code:
+                  type: string
+                  description: Warehouse code (optional - if not provided, checks all warehouses)
+                  example: WH-EAST
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockCheckResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/inventory/low-stock-alerts:
+    post:
+      summary: Get low stock alerts
+      description: Get products with inventory levels at or below reorder threshold
+      operationId: getLowStockAlerts
+      tags:
+        - Inventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category:
+                  type: string
+                  description: Filter by product category (optional)
+                  example: Electronics
+                warehouse_code:
+                  type: string
+                  description: Filter by warehouse code (optional)
+                  example: WH-EAST
+                limit:
+                  type: integer
+                  description: Maximum number of results to return
+                  default: 20
+                  example: 20
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LowStockAlertsResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/inventory/transaction-history:
+    post:
+      summary: Get inventory transaction history
+      description: Get transaction history for a product by SKU
+      operationId: getInventoryTransactionHistory
+      tags:
+        - Inventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sku
+              properties:
+                sku:
+                  type: string
+                  description: Product SKU
+                  example: LAPTOP-PRO-15
+                days:
+                  type: integer
+                  description: Number of days to look back
+                  default: 30
+                  example: 30
+                limit:
+                  type: integer
+                  description: Maximum number of results to return
+                  default: 50
+                  example: 50
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionHistoryResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/inventory/list:
+    get:
+      summary: List all products with inventory
+      description: Get a list of all products with their inventory levels across warehouses
+      operationId: listInventory
+      tags:
+        - Inventory
+      security: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryListResponse'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/inventory/update:
+    post:
+      summary: Update inventory quantity
+      description: Update inventory quantity for a product at a specific warehouse
+      operationId: updateInventory
+      tags:
+        - Inventory
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sku
+                - warehouseCode
+                - change
+              properties:
+                sku:
+                  type: string
+                  description: Product SKU
+                  example: LAPTOP-PRO-15
+                warehouseCode:
+                  type: string
+                  description: Warehouse code
+                  example: WH-EAST
+                change:
+                  type: integer
+                  description: Quantity change (positive for additions, negative for removals)
+                  example: 5
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryUpdateResponse'
+        '404':
+          description: Product or warehouse not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Product or warehouse not found
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  securitySchemes:
+    userPlusMode:
+      type: apiKey
+      description: |
+        User Plus Mode authentication combines user authentication, app authentication, and user context.
+        All requests must include Salesforce user context headers.
+      name: authorization
+      in: header
+
+  responses:
+    UnauthorizedError:
+      description: Authentication information is missing or invalid
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Missing Salesforce user context
+              message:
+                type: string
+                example: This endpoint requires User Plus Mode authentication
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: An unexpected error occurred
+
+  schemas:
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+          example: cust_12345
+        name:
+          type: string
+          example: Alice Smith
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        phone:
+          type: string
+          example: 555-123-4567
+        created_at:
+          type: string
+          format: date-time
+          example: '2023-01-15T10:30:00Z'
+        total_orders:
+          type: integer
+          example: 12
+        last_order_date:
+          type: string
+          format: date-time
+          example: '2023-06-20T14:25:00Z'
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          example: order_67890
+        order_date:
+          type: string
+          format: date-time
+          example: '2023-06-20T14:25:00Z'
+        total_amount:
+          type: number
+          format: float
+          example: 299.99
+        status:
+          type: string
+          example: Delivered
+        items_count:
+          type: integer
+          example: 3
+
+    Product:
+      type: object
+      properties:
+        sku:
+          type: string
+          example: LAPTOP-PRO-15
+        name:
+          type: string
+          example: Laptop Pro 15"
+        description:
+          type: string
+          example: Professional grade laptop with 15" display
+        category:
+          type: string
+          example: Electronics
+        unitPrice:
+          type: number
+          format: float
+          example: 1299.99
+        reorderLevel:
+          type: integer
+          example: 10
+
+    WarehouseInventory:
+      type: object
+      properties:
+        warehouseName:
+          type: string
+          example: East Coast Warehouse
+        warehouseLocation:
+          type: string
+          example: New York, NY
+        warehouseCode:
+          type: string
+          example: WH-EAST
+        quantityOnHand:
+          type: integer
+          example: 25
+        quantityReserved:
+          type: integer
+          example: 5
+        quantityAvailable:
+          type: integer
+          example: 20
+        stockStatus:
+          type: string
+          enum: [IN_STOCK, LOW_STOCK, OUT_OF_STOCK]
+          example: IN_STOCK
+
+    Transaction:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          example: tx_12345
+        productName:
+          type: string
+          example: Laptop Pro 15"
+        warehouseName:
+          type: string
+          example: East Coast Warehouse
+        warehouseCode:
+          type: string
+          example: WH-EAST
+        transactionType:
+          type: string
+          enum: [RECEIPT, SHIPMENT, ADJUSTMENT, TRANSFER]
+          example: RECEIPT
+        quantity:
+          type: integer
+          example: 10
+        referenceNumber:
+          type: string
+          example: PO-12345
+        notes:
+          type: string
+          example: Received from supplier
+        createdBy:
+          type: string
+          example: john.doe
+        createdAt:
+          type: string
+          format: date-time
+          example: '2023-06-15T09:30:00Z'
+
+    CustomerSearchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        requestedBy:
+          type: string
+          example: John Doe
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+        count:
+          type: integer
+          example: 3
+        query:
+          type: string
+          example: alice
+
+    CustomerOrdersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        requestedBy:
+          type: string
+          example: John Doe
+        customerId:
+          type: string
+          example: cust_12345
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        count:
+          type: integer
+          example: 5
+        periodDays:
+          type: integer
+          example: 30
+
+    CustomerInsightsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        found:
+          type: boolean
+          example: true
+        insights:
+          type: object
+          properties:
+            customerId:
+              type: string
+              example: cust_12345
+            name:
+              type: string
+              example: Alice Smith
+            email:
+              type: string
+              format: email
+              example: alice@example.com
+            totalOrders:
+              type: integer
+              example: 12
+            lifetimeValue:
+              type: number
+              format: float
+              example: 3450.75
+            lastOrderDate:
+              type: string
+              format: date-time
+              example: '2023-06-20T14:25:00Z'
+            customerSince:
+              type: string
+              format: date-time
+              example: '2022-03-15T09:00:00Z'
+            status:
+              type: string
+              example: VIP
+            requestedBy:
+              type: string
+              example: John Doe
+            requestedAt:
+              type: string
+              format: date-time
+              example: '2023-07-15T10:30:00Z'
+
+    StockCheckResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        found:
+          type: boolean
+          example: true
+        product:
+          $ref: '#/components/schemas/Product'
+        inventory:
+          type: object
+          properties:
+            totalAvailable:
+              type: integer
+              example: 45
+            totalOnHand:
+              type: integer
+              example: 50
+            totalReserved:
+              type: integer
+              example: 5
+            warehouses:
+              type: array
+              items:
+                $ref: '#/components/schemas/WarehouseInventory'
+        requestedBy:
+          type: string
+          example: John Doe
+        requestedAt:
+          type: string
+          format: date-time
+          example: '2023-07-15T10:30:00Z'
+
+    LowStockAlertsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        alerts:
+          type: array
+          items:
+            type: object
+            properties:
+              sku:
+                type: string
+                example: LAPTOP-PRO-15
+              productName:
+                type: string
+                example: Laptop Pro 15"
+              category:
+                type: string
+                example: Electronics
+              warehouseName:
+                type: string
+                example: East Coast Warehouse
+              warehouseCode:
+                type: string
+                example: WH-EAST
+              quantityOnHand:
+                type: integer
+                example: 8
+              quantityReserved:
+                type: integer
+                example: 3
+              quantityAvailable:
+                type: integer
+                example: 5
+              reorderLevel:
+                type: integer
+                example: 10
+              unitsBelowThreshold:
+                type: integer
+                example: 5
+        count:
+          type: integer
+          example: 3
+        requestedBy:
+          type: string
+          example: John Doe
+        filters:
+          type: object
+          properties:
+            category:
+              type: string
+              example: Electronics
+            warehouse_code:
+              type: string
+              example: WH-EAST
+
+    TransactionHistoryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        sku:
+          type: string
+          example: LAPTOP-PRO-15
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+        count:
+          type: integer
+          example: 10
+        requestedBy:
+          type: string
+          example: John Doe
+        periodDays:
+          type: integer
+          example: 30
+
+    InventoryListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        products:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                example: prod_12345
+              sku:
+                type: string
+                example: LAPTOP-PRO-15
+              name:
+                type: string
+                example: Laptop Pro 15"
+              description:
+                type: string
+                example: Professional grade laptop with 15" display
+              category:
+                type: string
+                example: Electronics
+              unitPrice:
+                type: number
+                format: float
+                example: 1299.99
+              reorderLevel:
+                type: integer
+                example: 10
+              warehouses:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WarehouseInventory'
+
+    InventoryUpdateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Received 5 units of Laptop Pro 15" at East Coast Warehouse
+        newQuantity:
+          type: integer
+          example: 30
+        available:
+          type: integer
+          example: 25
