@@ -27,18 +27,6 @@ if (hasSlackCredentials) {
     receiver
   });
   app = receiver.app;
-  
-  // Add explicit route handler for Slack URL verification
-  app.post('/slack/events', (req, res) => {
-    // Check if this is a challenge request from Slack
-    if (req.body && req.body.type === 'url_verification') {
-      console.log('Received Slack URL verification challenge');
-      // Respond with the challenge value
-      return res.json({ challenge: req.body.challenge });
-    }
-    // For other requests, let the Bolt framework handle it
-    return res.status(200).end();
-  });
   console.log('Slack credentials found - Slack integration enabled (ExpressReceiver)');
 } else {
   console.log('Slack credentials not found - Running without Slack integration');
@@ -48,6 +36,21 @@ if (hasSlackCredentials) {
 
 // Create Express app middleware for AppLink endpoints and UI
 app.use(bodyParser.json());
+
+// Dedicated endpoint for Slack URL verification challenge
+// This must be defined BEFORE any other middleware to ensure it's processed first
+app.post('/slack/events', (req, res, next) => {
+  // Check if this is a challenge request from Slack
+  if (req.body && req.body.type === 'url_verification') {
+    console.log('Received Slack URL verification challenge:', req.body.challenge);
+    // Respond with the challenge value in the exact format Slack expects
+    return res.json({ challenge: req.body.challenge });
+  }
+  
+  // If it's not a challenge request, continue to the next middleware
+  // which will be handled by the Bolt framework if Slack is configured
+  next();
+});
 
 // Serve static files
 app.use(express.static('public'));
@@ -955,6 +958,21 @@ slackApp.event('app_mention', async ({ event, say }) => {
 });
 
 } // End of Slack commands/events conditional block
+
+// Create a standalone verification endpoint that doesn't rely on Bolt
+app.post('/slack/verify', (req, res) => {
+  console.log('Received request to /slack/verify:', req.body);
+  
+  // Check if this is a challenge request from Slack
+  if (req.body && req.body.type === 'url_verification') {
+    console.log('Responding to Slack URL verification challenge with:', req.body.challenge);
+    // Respond with the challenge value in the exact format Slack expects
+    return res.json({ challenge: req.body.challenge });
+  }
+  
+  // If it's not a challenge request, just return OK
+  return res.status(200).json({ status: 'ok' });
+});
 
 // ===== SERVER STARTUP =====
 
