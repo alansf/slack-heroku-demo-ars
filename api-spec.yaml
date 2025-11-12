@@ -22,6 +22,12 @@ servers:
   - url: https://slack-heroku-demo-ars.herokuapp.com
     description: Production server
 
+x-sfdc:
+  heroku:
+    authorization:
+      connectedApp: My App Link Connected App
+      permissionSet: Manage Heroku AppLink
+
 security:
   - userPlusMode: []
 
