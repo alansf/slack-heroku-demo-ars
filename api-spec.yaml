@@ -25,8 +25,8 @@ servers:
 x-sfdc:
   heroku:
     authorization:
-      connectedApp: My App Link Connected App
-      permissionSet: Manage Heroku AppLink
+      connectedApp: MyAppLinkConnectedApp
+      permissionSet: ManageHerokuAppLink
 
 security:
   - userPlusMode: []
@@ -312,6 +312,51 @@ paths:
       tags:
         - Inventory
       security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sku
+                - warehouseCode
+                - change
+              properties:
+                sku:
+                  type: string
+                  description: Product SKU
+                  example: GPU-H100-80GB
+                warehouseCode:
+                  type: string
+                  description: Warehouse code
+                  example: WH-SF-001
+                change:
+                  type: integer
+                  description: Quantity delta (positive to add, negative to remove)
+                  example: 5
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryUpdateResponse'
+        '404':
+          description: Product or warehouse not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Product or warehouse not found
+        '500':
+          $ref: '#/components/responses/ServerError'
       
   /slack/events:
     post:
