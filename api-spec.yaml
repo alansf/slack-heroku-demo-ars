@@ -67,6 +67,11 @@ paths:
       operationId: searchCustomers
       tags:
         - Customer
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: MyAppLinkConnectedApp
+            permissionSet: ManageHerokuAppLink
       requestBody:
         required: true
         content:
@@ -104,6 +109,11 @@ paths:
       operationId: getCustomerOrders
       tags:
         - Customer
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: MyAppLinkConnectedApp
+            permissionSet: ManageHerokuAppLink
       parameters:
         - name: customerId
           in: path
@@ -143,6 +153,11 @@ paths:
       tags:
         - Customer
         - Analytics
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: MyAppLinkConnectedApp
+            permissionSet: ManageHerokuAppLink
       requestBody:
         required: true
         content:
@@ -176,6 +191,11 @@ paths:
       operationId: checkStock
       tags:
         - Inventory
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: MyAppLinkConnectedApp
+            permissionSet: ManageHerokuAppLink
       requestBody:
         required: true
         content:
@@ -212,6 +232,11 @@ paths:
       operationId: getLowStockAlerts
       tags:
         - Inventory
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: MyAppLinkConnectedApp
+            permissionSet: ManageHerokuAppLink
       requestBody:
         required: true
         content:
@@ -251,6 +276,11 @@ paths:
       operationId: getInventoryTransactionHistory
       tags:
         - Inventory
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: MyAppLinkConnectedApp
+            permissionSet: ManageHerokuAppLink
       requestBody:
         required: true
         content:
@@ -293,6 +323,11 @@ paths:
       operationId: listInventory
       tags:
         - Inventory
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: MyAppLinkConnectedApp
+            permissionSet: ManageHerokuAppLink
       security: []
       responses:
         '200':
@@ -312,6 +347,11 @@ paths:
       tags:
         - Inventory
       security: []
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: MyAppLinkConnectedApp
+            permissionSet: ManageHerokuAppLink
       requestBody:
         required: true
         content:
