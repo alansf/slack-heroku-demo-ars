@@ -41,6 +41,36 @@ app.use('/api', bodyParser.json());
 // Serve static files
 app.use(express.static('public'));
 
+// ===== Helpers =====
+// Resolve a human-friendly input into a definitive SKU.
+// Strategy:
+// 1) Exact SKU match (case-insensitive)
+// 2) Name contains search (ILIKE %term%)
+// 3) If multiple name matches, pick the shortest name (most specific) then by SKU
+async function resolveSkuFromInput(input) {
+  if (!input) return null;
+  const raw = String(input).trim();
+  if (!raw) return null;
+
+  // Try exact SKU (uppercased)
+  const exact = await pool.query('SELECT sku FROM products WHERE UPPER(sku) = $1 LIMIT 1', [raw.toUpperCase()]);
+  if (exact.rows.length > 0) {
+    return exact.rows[0].sku;
+  }
+
+  // Try name contains
+  const nameMatch = await pool.query(
+    'SELECT sku FROM products WHERE name ILIKE $1 ORDER BY LENGTH(name) ASC, sku ASC LIMIT 1',
+    ['%' + raw + '%']
+  );
+  if (nameMatch.rows.length > 0) {
+    return nameMatch.rows[0].sku;
+  }
+
+  // No match
+  return null;
+}
+
 // Health check endpoint
 app.get('/', (req, res) => {
   res.json({
@@ -413,7 +443,19 @@ app.post('/api/inventory/check-stock', validateUserPlusMode, async (req, res) =>
     const { sku, warehouse_code } = req.body;
     const sfContext = req.salesforceContext;
 
-    console.log('[User Plus Mode] User ' + sfContext.userName + ' checking stock for SKU: ' + sku);
+    // Allow natural language: accept product name in "sku" and resolve to actual SKU
+    const resolvedSku = await resolveSkuFromInput(sku);
+    if (!resolvedSku) {
+      return res.json({
+        success: true,
+        found: false,
+        message: 'Product not found. Try a SKU or product name.',
+        query: sku,
+        requestedBy: sfContext.userName
+      });
+    }
+
+    console.log('[User Plus Mode] User ' + sfContext.userName + ' checking stock for SKU: ' + resolvedSku + ' (input: ' + sku + ')');
 
     let query, params;
 
@@ -443,7 +485,7 @@ app.post('/api/inventory/check-stock', validateUserPlusMode, async (req, res) =>
         JOIN warehouses w ON i.warehouse_id = w.id
         WHERE p.sku = $1 AND w.code = $2
       `;
-      params = [sku, warehouse_code];
+      params = [resolvedSku, warehouse_code];
     } else {
       // Check stock across all warehouses
       query = `
@@ -471,7 +513,7 @@ app.post('/api/inventory/check-stock', validateUserPlusMode, async (req, res) =>
         WHERE p.sku = $1
         ORDER BY i.quantity_available DESC
       `;
-      params = [sku];
+      params = [resolvedSku];
     }
 
     const result = await pool.query(query, params);
@@ -481,7 +523,7 @@ app.post('/api/inventory/check-stock', validateUserPlusMode, async (req, res) =>
         success: true,
         found: false,
         message: 'Product not found or no inventory data available',
-        sku: sku,
+        sku: resolvedSku,
         requestedBy: sfContext.userName
       });
     }
@@ -750,15 +792,23 @@ slackApp.command('/database-stats', async ({ ack, respond }) => {
 slackApp.command('/stock', async ({ command, ack, respond }) => {
   await ack();
 
-  const sku = command.text.trim().toUpperCase();
+  const rawInput = command.text.trim();
 
-  if (!sku) {
+  if (!rawInput) {
     return respond({
-      text: 'Please provide a product SKU. Usage: /stock <SKU>\n\nExample: /stock LAPTOP-PRO-15'
+      text: 'Please provide a product SKU or name. Usage: /stock <SKU or Name>\n\nExamples:\n• /stock LAPTOP-PRO-15\n• /stock EUV Photoresist Chemical'
     });
   }
 
   try {
+    // Resolve input to SKU (accept natural language product names)
+    const resolvedSku = await resolveSkuFromInput(rawInput);
+    if (!resolvedSku) {
+      return respond({
+        text: 'Product not found for "' + rawInput + '". Try a SKU or product name.'
+      });
+    }
+
     // Query inventory across all warehouses
     const result = await pool.query(
       `SELECT
@@ -783,12 +833,12 @@ slackApp.command('/stock', async ({ command, ack, respond }) => {
       JOIN warehouses w ON i.warehouse_id = w.id
       WHERE p.sku = $1
       ORDER BY i.quantity_available DESC`,
-      [sku]
+      [resolvedSku]
     );
 
     if (result.rows.length === 0) {
       return respond({
-        text: 'Product not found: ' + sku + '\n\nPlease check the SKU and try again.'
+        text: 'Product not found: ' + resolvedSku + '\n\nPlease check the SKU and try again.'
       });
     }
 
