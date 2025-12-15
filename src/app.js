@@ -71,6 +71,14 @@ async function resolveSkuFromInput(input) {
   return null;
 }
 
+// Lightweight debug logger, disabled by default unless DEBUG_LOGS=true
+const DEBUG_LOGS = process.env.DEBUG_LOGS === 'true';
+function debugLog(...args) {
+  if (DEBUG_LOGS) {
+    console.log(...args);
+  }
+}
+
 // Health check endpoint
 app.get('/', (req, res) => {
   res.json({
@@ -95,26 +103,20 @@ app.get('/favicon.ico', (req, res) => {
 // AppLink User Plus Mode Authentication Middleware
 // User Plus Mode validates both the Salesforce user AND app credentials
 const validateUserPlusMode = (req, res, next) => {
-  const sfUserId = req.headers['x-salesforce-user-id'];
-  const sfOrgId = req.headers['x-salesforce-org-id'];
-  const authHeader = req.headers['authorization'];
-  
-  // In User Plus Mode, AppLink sends both user context AND validates app credentials
-  if (!sfUserId || !sfOrgId) {
-    return res.status(401).json({ 
-      error: 'Missing Salesforce user context',
-      message: 'This endpoint requires User Plus Mode authentication'
-    });
-  }
-  
-  // Store user context for use in handlers
+  // Trust the App Link Service Mesh to authenticate requests before forwarding.
+  // Mesh strips certain headers by design. Treat user context headers as optional metadata.
+  const sfUserId = req.headers['x-salesforce-user-id'] || null;
+  const sfOrgId = req.headers['x-salesforce-org-id'] || null;
+  const sfUserEmail = req.headers['x-salesforce-user-email'] || null;
+  const sfUserName = req.headers['x-salesforce-user-name'] || 'AppLink Authenticated User';
+
   req.salesforceContext = {
     userId: sfUserId,
     orgId: sfOrgId,
-    userEmail: req.headers['x-salesforce-user-email'],
-    userName: req.headers['x-salesforce-user-name']
+    userEmail: sfUserEmail,
+    userName: sfUserName
   };
-  
+
   next();
 };
 
@@ -126,7 +128,7 @@ app.post('/api/customers/search', validateUserPlusMode, async (req, res) => {
     const { searchTerm, limit = 10 } = req.body;
     const sfContext = req.salesforceContext;
     
-    console.log('[User Plus Mode] User ' + sfContext.userName + ' (' + sfContext.userId + ') searching for: ' + searchTerm);
+    debugLog('[User Plus Mode] User ' + sfContext.userName + ' (' + sfContext.userId + ') searching for: ' + searchTerm);
     
     // Query external database for customer data
     const result = await pool.query(
@@ -157,7 +159,7 @@ app.post('/api/customers/:customerId/orders', validateUserPlusMode, async (req, 
     const { days = 30 } = req.body;
     const sfContext = req.salesforceContext;
     
-    console.log('[User Plus Mode] User ' + sfContext.userName + ' fetching orders for customer: ' + customerId);
+    debugLog('[User Plus Mode] User ' + sfContext.userName + ' fetching orders for customer: ' + customerId);
     
     const result = await pool.query(
       "SELECT o.id, o.order_date, o.total_amount, o.status, o.items_count FROM orders o WHERE o.customer_id = $1 AND o.order_date > NOW() - INTERVAL '1 day' * $2 ORDER BY o.order_date DESC",
@@ -187,7 +189,7 @@ app.post('/api/analytics/customer-insights', validateUserPlusMode, async (req, r
     const { email } = req.body;
     const sfContext = req.salesforceContext;
     
-    console.log('[User Plus Mode] User ' + sfContext.userName + ' requesting insights for: ' + email);
+    debugLog('[User Plus Mode] User ' + sfContext.userName + ' requesting insights for: ' + email);
     
     // Get customer data from external database
     const customerResult = await pool.query(
@@ -297,7 +299,7 @@ app.post('/api/inventory/update', async (req, res) => {
   try {
     const { sku, warehouseCode, change } = req.body;
 
-    console.log('[UI Update] Updating inventory for ' + sku + ' at ' + warehouseCode + ' by ' + change);
+    debugLog('[UI Update] Updating inventory for ' + sku + ' at ' + warehouseCode + ' by ' + change);
 
     const client = await pool.connect();
     try {
@@ -385,12 +387,12 @@ async function sendSlackNotification(message, details) {
   try {
     // Skip if Slack is not configured
     if (!slackApp) {
-      console.log('[Slack Notification] Slack not configured, skipping notification');
+      debugLog('[Slack Notification] Slack not configured, skipping notification');
       return;
     }
 
     if (!process.env.SLACK_NOTIFICATION_CHANNEL) {
-      console.log('[Slack Notification] No channel configured, skipping notification');
+      debugLog('[Slack Notification] No channel configured, skipping notification');
       return;
     }
 
@@ -431,7 +433,7 @@ async function sendSlackNotification(message, details) {
         }
       ]
     });
-    console.log('[Slack Notification] Sent successfully');
+    debugLog('[Slack Notification] Sent successfully');
   } catch (error) {
     console.error('[Slack Notification] Failed to send:', error.message);
   }
@@ -455,7 +457,7 @@ app.post('/api/inventory/check-stock', validateUserPlusMode, async (req, res) =>
       });
     }
 
-    console.log('[User Plus Mode] User ' + sfContext.userName + ' checking stock for SKU: ' + resolvedSku + ' (input: ' + sku + ')');
+    debugLog('[User Plus Mode] User ' + sfContext.userName + ' checking stock for SKU: ' + resolvedSku + ' (input: ' + sku + ')');
 
     let query, params;
 
@@ -576,7 +578,7 @@ app.post('/api/inventory/low-stock-alerts', validateUserPlusMode, async (req, re
     const { category, warehouse_code, limit = 20 } = req.body;
     const sfContext = req.salesforceContext;
 
-    console.log('[User Plus Mode] User ' + sfContext.userName + ' fetching low stock alerts');
+    debugLog('[User Plus Mode] User ' + sfContext.userName + ' fetching low stock alerts');
 
     let query = 'SELECT * FROM low_stock_alerts WHERE 1=1';
     const params = [];
@@ -633,7 +635,7 @@ app.post('/api/inventory/transaction-history', validateUserPlusMode, async (req,
     const { sku, days = 30, limit = 50 } = req.body;
     const sfContext = req.salesforceContext;
 
-    console.log('[User Plus Mode] User ' + sfContext.userName + ' fetching transaction history for: ' + sku);
+    debugLog('[User Plus Mode] User ' + sfContext.userName + ' fetching transaction history for: ' + sku);
 
     const result = await pool.query(
       `SELECT
