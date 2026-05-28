@@ -21,8 +21,19 @@ global with sharing class AFOImportRequestRest {
     }
 
     @HttpPost
-    global static ImportRequestResponse upsertRequest(ImportRequestPayload payload) {
+    global static ImportRequestResponse upsertRequest() {
         ImportRequestResponse resp = new ImportRequestResponse();
+
+        ImportRequestPayload payload;
+        try {
+            String body = RestContext.request.requestBody == null ? '' : RestContext.request.requestBody.toString();
+            payload = (ImportRequestPayload) JSON.deserialize(body, ImportRequestPayload.class);
+        } catch (Exception e) {
+            RestContext.response.statusCode = 400;
+            resp.success = false;
+            resp.message = 'Invalid JSON body: ' + e.getMessage();
+            return resp;
+        }
 
         if (payload == null || String.isBlank(payload.import_id)) {
             RestContext.response.statusCode = 400;

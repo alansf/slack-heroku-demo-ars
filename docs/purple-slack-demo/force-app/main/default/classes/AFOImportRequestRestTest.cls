@@ -24,7 +24,7 @@ private class AFOImportRequestRestTest {
         buildPostRequest(JSON.serialize(p));
 
         Test.startTest();
-        AFOImportRequestRest.ImportRequestResponse resp = AFOImportRequestRest.upsertRequest(p);
+        AFOImportRequestRest.ImportRequestResponse resp = AFOImportRequestRest.upsertRequest();
         Test.stopTest();
 
         System.assertEquals(true, resp.success, 'expected success');
@@ -55,7 +55,7 @@ private class AFOImportRequestRestTest {
         buildPostRequest(JSON.serialize(p));
 
         Test.startTest();
-        AFOImportRequestRest.ImportRequestResponse resp = AFOImportRequestRest.upsertRequest(p);
+        AFOImportRequestRest.ImportRequestResponse resp = AFOImportRequestRest.upsertRequest();
         Test.stopTest();
 
         System.assertEquals(true, resp.success);
@@ -74,7 +74,7 @@ private class AFOImportRequestRestTest {
         p.status = 'Submitted';
         buildPostRequest(JSON.serialize(p));
 
-        AFOImportRequestRest.ImportRequestResponse resp = AFOImportRequestRest.upsertRequest(p);
+        AFOImportRequestRest.ImportRequestResponse resp = AFOImportRequestRest.upsertRequest();
 
         System.assertEquals(false, resp.success);
         System.assertEquals(400, RestContext.response.statusCode);
