@@ -3,3 +3,6 @@ npm-debug.log
 .env
 .DS_Store
 *.log
+.sfdx/
+.sf/
+.claude/

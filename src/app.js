@@ -688,6 +688,191 @@ app.post('/api/inventory/transaction-history', validateUserPlusMode, async (req,
   }
 });
 
+// ===== AGENTFORCE OPERATIONS (AFO) — GENAI IMPORT BLUEPRINT =====
+
+// Stage B kickoff: AFO posts here when the manager-approval task is assigned.
+// We render a Slack Block Kit message with Approve/Reject buttons whose value
+// payload contains the AFO task_id and complete_url so the button handler can
+// drive the workflow forward.
+app.post('/api/afo/approve-request', validateUserPlusMode, async (req, res) => {
+  try {
+    const {
+      blueprint,
+      workflow_id,
+      task_id,
+      import_id,
+      requested_by,
+      validation,
+      complete_url,
+      callback_token
+    } = req.body || {};
+
+    if (!task_id || !import_id || !complete_url) {
+      return res.status(400).json({
+        success: false,
+        error: 'task_id, import_id, and complete_url are required'
+      });
+    }
+
+    if (!slackApp || !process.env.SLACK_AFO_APPROVAL_CHANNEL) {
+      return res.status(503).json({
+        success: false,
+        error: 'Slack approval channel is not configured (SLACK_AFO_APPROVAL_CHANNEL).'
+      });
+    }
+
+    const requesterLabel = requested_by && requested_by.name
+      ? requested_by.name + ' <' + (requested_by.email || 'no-email') + '>'
+      : 'Unknown';
+
+    const buttonValue = JSON.stringify({
+      task_id,
+      complete_url,
+      callback_token,
+      import_id,
+      workflow_id
+    });
+
+    await slackApp.client.chat.postMessage({
+      token: process.env.SLACK_BOT_TOKEN,
+      channel: process.env.SLACK_AFO_APPROVAL_CHANNEL,
+      text: ':robot_face: GenAI Import approval requested for ' + import_id,
+      blocks: [
+        {
+          type: 'header',
+          text: { type: 'plain_text', text: ':robot_face: GenAI Data Import — Approval Required' }
+        },
+        {
+          type: 'section',
+          fields: [
+            { type: 'mrkdwn', text: '*Import Id:*\n' + import_id },
+            { type: 'mrkdwn', text: '*Blueprint:*\n' + (blueprint || 'genai-data-import') },
+            { type: 'mrkdwn', text: '*Requested By:*\n' + requesterLabel },
+            { type: 'mrkdwn', text: '*Workflow:*\n' + (workflow_id || 'n/a') }
+          ]
+        },
+        {
+          type: 'section',
+          fields: [
+            { type: 'mrkdwn', text: '*Validation:*\n' + ((validation && validation.status) || 'n/a') },
+            { type: 'mrkdwn', text: '*Records:*\n' + ((validation && validation.record_count) || 0) },
+            { type: 'mrkdwn', text: '*Row Errors:*\n' + ((validation && validation.row_errors_count) || 0) }
+          ]
+        },
+        {
+          type: 'actions',
+          block_id: 'afo_decision',
+          elements: [
+            {
+              type: 'button',
+              style: 'primary',
+              text: { type: 'plain_text', text: 'Approve' },
+              action_id: 'afo_approve',
+              value: buttonValue
+            },
+            {
+              type: 'button',
+              style: 'danger',
+              text: { type: 'plain_text', text: 'Reject' },
+              action_id: 'afo_reject',
+              value: buttonValue
+            }
+          ]
+        }
+      ]
+    });
+
+    res.json({ success: true, posted: true, channel: process.env.SLACK_AFO_APPROVAL_CHANNEL });
+  } catch (error) {
+    console.error('Error in /api/afo/approve-request:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Stage C commit: AFO posts here after approval. For the demo we just record
+// the commit and forward an audit row to Salesforce. Replace the "commit work"
+// block with a real call into your import pipeline.
+app.post('/api/afo/commit-import', validateUserPlusMode, async (req, res) => {
+  try {
+    const { import_id, source_dataset, approved_by, workflow_id } = req.body || {};
+    if (!import_id) {
+      return res.status(400).json({ success: false, error: 'import_id is required' });
+    }
+
+    debugLog('[AFO Commit] import_id=' + import_id + ' dataset=' + source_dataset);
+
+    await postAfoAuditToSalesforce({
+      import_id,
+      status: 'Committed',
+      afo_workflow_id: workflow_id,
+      decided_by: approved_by || null,
+      decided_at: new Date().toISOString()
+    });
+
+    res.json({
+      success: true,
+      import_id,
+      committed_at: new Date().toISOString(),
+      committed_by: approved_by || null
+    });
+  } catch (error) {
+    console.error('Error in /api/afo/commit-import:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Helper: forward an audit upsert to the Salesforce Apex REST endpoint
+// AFOImportRequestRest. Best-effort — failures are logged but don't break the
+// AFO flow. Configure SF_APEX_REST_BASE_URL + SF_BEARER_TOKEN.
+async function postAfoAuditToSalesforce(payload) {
+  try {
+    const base = process.env.SF_APEX_REST_BASE_URL;
+    const token = process.env.SF_BEARER_TOKEN;
+    if (!base || !token) {
+      debugLog('[AFO Audit] SF_APEX_REST_BASE_URL/SF_BEARER_TOKEN not set, skipping audit');
+      return;
+    }
+    const resp = await fetch(base.replace(/\/$/, '') + '/afo/import-request', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!resp.ok) {
+      const body = await resp.text();
+      console.error('[AFO Audit] Salesforce upsert failed: ' + resp.status + ' ' + body);
+    }
+  } catch (err) {
+    console.error('[AFO Audit] Salesforce upsert error:', err.message);
+  }
+}
+
+// Helper: complete an AFO task. The complete_url comes from AFO's webhook
+// payload so we don't have to know the tenant URL up front.
+async function completeAfoTask(completeUrl, decision, callbackToken, decidedBy) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (callbackToken) headers['X-Regrello-Callback-Token'] = callbackToken;
+  if (process.env.AFO_BEARER_TOKEN) {
+    headers['Authorization'] = 'Bearer ' + process.env.AFO_BEARER_TOKEN;
+  }
+  const resp = await fetch(completeUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      decision, // 'approve' | 'reject'
+      decided_by: decidedBy,
+      decided_at: new Date().toISOString()
+    })
+  });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error('AFO task completion failed: ' + resp.status + ' ' + body);
+  }
+  return resp.json().catch(() => ({}));
+}
+
 // ===== SLACK BOT COMMANDS =====
 
 // Only register Slack commands if Slack is configured
@@ -979,6 +1164,66 @@ slackApp.command('/low-stock', async ({ command, ack, respond }) => {
     });
   }
 });
+
+// AFO approval button handlers — drive the AFO task forward and mirror the
+// decision into Salesforce as an audit upsert.
+async function handleAfoDecision(decision, { ack, body, action, respond, client }) {
+  await ack();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(action.value);
+  } catch (e) {
+    return respond({ replace_original: false, text: 'Could not parse approval payload.' });
+  }
+
+  const decidedBy = (body.user && (body.user.email || body.user.username || body.user.name)) || 'unknown';
+
+  try {
+    await completeAfoTask(parsed.complete_url, decision, parsed.callback_token, decidedBy);
+  } catch (err) {
+    console.error('[AFO Decision] AFO completion error:', err.message);
+    return respond({
+      replace_original: false,
+      text: ':warning: Could not complete AFO task: ' + err.message
+    });
+  }
+
+  await postAfoAuditToSalesforce({
+    import_id: parsed.import_id,
+    status: decision === 'approve' ? 'Approved' : 'Rejected',
+    afo_workflow_id: parsed.workflow_id,
+    afo_task_id: parsed.task_id,
+    decided_by: decidedBy,
+    decided_at: new Date().toISOString()
+  });
+
+  // Replace the original message so the buttons can't be clicked twice.
+  const verb = decision === 'approve' ? 'Approved' : 'Rejected';
+  const emoji = decision === 'approve' ? ':white_check_mark:' : ':x:';
+  try {
+    await client.chat.update({
+      token: process.env.SLACK_BOT_TOKEN,
+      channel: body.channel.id,
+      ts: body.message.ts,
+      text: emoji + ' GenAI Import ' + verb + ' for ' + parsed.import_id,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: emoji + ' *GenAI Import ' + verb + '* for `' + parsed.import_id + '`\nDecided by ' + decidedBy + ' at ' + new Date().toLocaleString()
+          }
+        }
+      ]
+    });
+  } catch (err) {
+    debugLog('[AFO Decision] chat.update failed: ' + err.message);
+  }
+}
+
+slackApp.action('afo_approve', (args) => handleAfoDecision('approve', args));
+slackApp.action('afo_reject', (args) => handleAfoDecision('reject', args));
 
 // Welcome message
 slackApp.event('app_mention', async ({ event, say }) => {

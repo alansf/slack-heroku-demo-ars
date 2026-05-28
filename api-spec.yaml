@@ -452,6 +452,91 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
 
+  /api/afo/approve-request:
+    post:
+      summary: AFO Stage B kickoff
+      description: |
+        Receives the manager-approval webhook from Agentforce Operations and posts a Slack
+        Block Kit message with Approve/Reject buttons. Buttons drive the AFO task forward
+        via the carried complete_url.
+      operationId: afoApproveRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, import_id, complete_url]
+              properties:
+                blueprint:        { type: string, example: genai-data-import }
+                workflow_id:      { type: string, example: 11111111-2222-3333-4444-555555555555 }
+                stage:            { type: string, example: manager-approval }
+                task_id:          { type: string, example: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee }
+                import_id:        { type: string, example: GENAI-IMP-2026-0042 }
+                requested_by:
+                  type: object
+                  properties:
+                    name:  { type: string, example: Alan Scott }
+                    email: { type: string, example: alan@example.com }
+                action_required:  { type: string, example: approve|reject }
+                validation:
+                  type: object
+                  properties:
+                    status:            { type: string, example: PASS }
+                    record_count:      { type: integer, example: 1280 }
+                    row_errors_count:  { type: integer, example: 0 }
+                complete_url:     { type: string, example: https://regrello.example.com/api/v1/tasks/abc/complete }
+                callback_token:   { type: string, example: redacted }
+      responses:
+        '200':
+          description: Slack message posted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  posted:  { type: boolean, example: true }
+                  channel: { type: string, example: C0123456789 }
+        '400':
+          description: Missing required fields
+        '503':
+          description: Slack approval channel not configured
+
+  /api/afo/commit-import:
+    post:
+      summary: AFO Stage C commit
+      description: |
+        Final stage of the GenAI Import blueprint. Records the commit and forwards
+        an audit upsert to the Salesforce purple-slack-demo org.
+      operationId: afoCommitImport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [import_id]
+              properties:
+                import_id:      { type: string, example: GENAI-IMP-2026-0042 }
+                source_dataset: { type: string, example: s3://genai/incoming/2026-05-28.csv }
+                approved_by:    { type: string, example: manager@example.com }
+                workflow_id:    { type: string, example: 11111111-2222-3333-4444-555555555555 }
+      responses:
+        '200':
+          description: Commit recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:      { type: boolean, example: true }
+                  import_id:    { type: string, example: GENAI-IMP-2026-0042 }
+                  committed_at: { type: string, format: date-time }
+                  committed_by: { type: string, example: manager@example.com }
+        '400':
+          description: Missing import_id
+
 components:
   securitySchemes:
     userPlusMode:

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+    <description>Posts a Chatter notification on a GenAIImportRequest__c when Status__c becomes Approved or Rejected.</description>
+    <environments>Default</environments>
+    <interviewLabel>AFO Import Status Notify {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>AFO Import Status Notify</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <runInMode>SystemModeWithSharing</runInMode>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Post_Decision_Chatter</targetReference>
+        </connector>
+        <doesRequireRecordChangedToMeetCriteria>true</doesRequireRecordChangedToMeetCriteria>
+        <filterFormula>OR(ISPICKVAL({!$Record.Status__c}, &quot;Approved&quot;), ISPICKVAL({!$Record.Status__c}, &quot;Rejected&quot;))</filterFormula>
+        <object>GenAIImportRequest__c</object>
+        <recordTriggerType>Update</recordTriggerType>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <status>Active</status>
+    <actionCalls>
+        <name>Post_Decision_Chatter</name>
+        <label>Post Decision to Chatter</label>
+        <locationX>176</locationX>
+        <locationY>134</locationY>
+        <actionName>chatterPost</actionName>
+        <actionType>chatterPost</actionType>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>subjectNameOrId</name>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>text</name>
+            <value>
+                <elementReference>Decision_Message</elementReference>
+            </value>
+        </inputParameters>
+        <nameSegment>chatterPost</nameSegment>
+    </actionCalls>
+    <formulas>
+        <name>Decision_Message</name>
+        <dataType>String</dataType>
+        <expression>&quot;GenAI Import &quot; &amp; TEXT({!$Record.Status__c}) &amp; &quot; — Import Id: &quot; &amp; {!$Record.Import_Id__c} &amp; IF(ISBLANK({!$Record.Decided_By__c}), &quot;&quot;, &quot; (decided by &quot; &amp; {!$Record.Decided_By__c} &amp; &quot;)&quot;)</expression>
+    </formulas>
+</Flow>

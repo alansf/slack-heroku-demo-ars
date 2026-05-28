@@ -1,0 +1,189 @@
+{
+  "$schema": "https://example.com/regrello-blueprint-spec.v0.json",
+  "_note": "Representative spec only. AFO/Regrello has no public blueprint-import API; this document describes the topology to build in the Regrello UI or feed to its LLM blueprint-builder.",
+  "blueprint": {
+    "name": "GenAI Data Import",
+    "key": "genai-data-import",
+    "description": "Validate, approve, and commit a GenAI-generated dataset import. Step B is human-in-the-loop via Slack.",
+    "tags": ["genai", "data-import", "back-office", "slack-approval"],
+    "owner_group": "Data Operations"
+  },
+  "data_sources": [
+    {
+      "name": "heroku_inventory_db",
+      "type": "sql",
+      "purpose": "Source-of-truth lookups during validation"
+    }
+  ],
+  "integrations": [
+    {
+      "name": "heroku_slack_app",
+      "type": "custom_http",
+      "base_url": "${HEROKU_BASE_URL}",
+      "auth": {
+        "kind": "bearer",
+        "secret_ref": "AFO_HEROKU_BEARER"
+      },
+      "purpose": "Outbound webhooks from AFO into the slack-heroku-demo-ars app"
+    },
+    {
+      "name": "salesforce_apex_rest",
+      "type": "custom_http",
+      "base_url": "${SF_INSTANCE_URL}/services/apexrest",
+      "auth": {
+        "kind": "oauth2_client_credentials",
+        "secret_ref": "SF_CONNECTED_APP"
+      },
+      "purpose": "Audit trail upserts into purple-slack-demo org"
+    }
+  ],
+  "user_groups": [
+    {
+      "name": "Import Managers",
+      "members_ref": "regrello://groups/import-managers",
+      "purpose": "Approvers for Stage B"
+    }
+  ],
+  "stages": [
+    {
+      "id": "stage-a-validate",
+      "name": "Validate",
+      "execution_order": 1,
+      "tasks": [
+        {
+          "id": "task-validate",
+          "type": "automation_task",
+          "name": "Run validation",
+          "agent": "RegrelloAgent",
+          "input_form": {
+            "fields": [
+              { "name": "import_id", "type": "string", "required": true, "external_id": true },
+              { "name": "source_dataset", "type": "string", "required": true },
+              { "name": "requested_by", "type": "email", "required": true },
+              { "name": "record_count", "type": "integer", "required": true }
+            ]
+          },
+          "output_form": {
+            "fields": [
+              { "name": "validation_status", "type": "enum", "values": ["PASS", "FAIL"] },
+              { "name": "validation_notes", "type": "long_text" },
+              { "name": "row_errors_count", "type": "integer" }
+            ]
+          },
+          "on_complete_webhook": {
+            "integration": "salesforce_apex_rest",
+            "method": "POST",
+            "path": "/afo/import-request",
+            "body": {
+              "import_id": "{{import_id}}",
+              "requested_by": "{{requested_by}}",
+              "status": "Validated",
+              "validation_notes": "{{validation_notes}}",
+              "afo_workflow_id": "{{workflow.id}}",
+              "afo_task_id": "{{task.id}}"
+            }
+          },
+          "branch": {
+            "on": "validation_status",
+            "FAIL": { "goto": "end", "outcome": "rejected" },
+            "PASS": { "goto": "stage-b-approval" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "stage-b-approval",
+      "name": "Manager Approval",
+      "execution_order": 2,
+      "tasks": [
+        {
+          "id": "task-approve",
+          "type": "approval_task",
+          "name": "Manager approves GenAI import",
+          "approver_group": "Import Managers",
+          "due_in_hours": 24,
+          "on_assign_webhook": {
+            "integration": "heroku_slack_app",
+            "method": "POST",
+            "path": "/api/afo/approve-request",
+            "body": {
+              "blueprint": "genai-data-import",
+              "workflow_id": "{{workflow.id}}",
+              "stage": "manager-approval",
+              "task_id": "{{task.id}}",
+              "import_id": "{{import_id}}",
+              "requested_by": {
+                "name": "{{requested_by.name}}",
+                "email": "{{requested_by.email}}"
+              },
+              "action_required": "approve|reject",
+              "validation": {
+                "status": "{{validation_status}}",
+                "row_errors_count": "{{row_errors_count}}",
+                "record_count": "{{record_count}}"
+              },
+              "complete_url": "${REGRELLO_API_BASE}/api/v1/tasks/{{task.id}}/complete",
+              "callback_token": "{{task.callback_token}}"
+            }
+          },
+          "on_complete_webhook": {
+            "integration": "salesforce_apex_rest",
+            "method": "POST",
+            "path": "/afo/import-request",
+            "body": {
+              "import_id": "{{import_id}}",
+              "status": "{{decision == 'approve' ? 'Approved' : 'Rejected'}}",
+              "decided_by": "{{decided_by.email}}",
+              "decided_at": "{{now}}",
+              "afo_workflow_id": "{{workflow.id}}",
+              "afo_task_id": "{{task.id}}"
+            }
+          },
+          "on_reject": { "goto": "end", "outcome": "rejected" },
+          "on_approve": { "goto": "stage-c-commit" }
+        }
+      ]
+    },
+    {
+      "id": "stage-c-commit",
+      "name": "Commit",
+      "execution_order": 3,
+      "tasks": [
+        {
+          "id": "task-commit",
+          "type": "automation_task",
+          "name": "Commit validated import",
+          "integration": "heroku_slack_app",
+          "request": {
+            "method": "POST",
+            "path": "/api/afo/commit-import",
+            "body": {
+              "import_id": "{{import_id}}",
+              "source_dataset": "{{source_dataset}}",
+              "approved_by": "{{decided_by.email}}",
+              "workflow_id": "{{workflow.id}}"
+            }
+          },
+          "output_form": {
+            "fields": [
+              { "name": "committed_at", "type": "datetime" },
+              { "name": "committed_by", "type": "email" },
+              { "name": "result_summary", "type": "long_text" }
+            ]
+          },
+          "on_complete_webhook": {
+            "integration": "salesforce_apex_rest",
+            "method": "POST",
+            "path": "/afo/import-request",
+            "body": {
+              "import_id": "{{import_id}}",
+              "status": "Committed",
+              "afo_workflow_id": "{{workflow.id}}"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "outcomes": ["committed", "rejected", "failed"]
+}
